@@ -1,0 +1,11 @@
+[workspace]
+members = [
+  "archive",
+  "fingerprint"
+]
+
+[profile.dev.package.backtrace]
+opt-level = 3
+
+[profile.release]
+lto = "fat"
