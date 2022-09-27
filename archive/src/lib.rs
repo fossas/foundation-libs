@@ -35,7 +35,6 @@ pub struct Options {
 /// Recursion mode for expanding archives.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Derivative)]
 #[derivative(Default)]
-#[non_exhaustive]
 pub enum Recursion {
     /// Recursive archive expansion is enabled with the specified associated options.
     #[derivative(Default)]
@@ -67,7 +66,6 @@ pub enum Recursion {
 
 /// Identification mode for identifying archives to expand.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
-#[non_exhaustive]
 pub enum Identification {
     /// Use the file extension to identify an archive expansion strategy.
     #[default]
