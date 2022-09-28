@@ -1,6 +1,4 @@
 use std::{
-    borrow::Cow,
-    collections::HashSet,
     io::{Read, Seek, SeekFrom},
     path::Path,
 };
@@ -13,7 +11,7 @@ use tempfile::tempdir;
 use super::*;
 
 lazy_static! {
-    static ref SUPPORTED_EXTS: HashSet<&'static str> = HashSet::from(["zip", "tar"]);
+    static ref SUPPORTED_EXTS: Vec<&'static str> = vec![".zip", ".tar", ".tar.gz"];
 }
 
 /// The libarchive powered strategy: https://github.com/libarchive/libarchive.
@@ -72,14 +70,10 @@ fn content_is_binary<R: Read>(stream: &mut R) -> Result<bool, io::Error> {
 }
 
 fn ext_is_supported(path: &Path) -> bool {
-    match safe_ext(path) {
-        Some(ext) => SUPPORTED_EXTS.contains(ext.as_ref()),
+    match path.file_name().map(|file| file.to_string_lossy()) {
+        Some(file) => SUPPORTED_EXTS.iter().any(|ext| file.ends_with(ext)),
         None => false,
     }
-}
-
-fn safe_ext(path: &'_ Path) -> Option<Cow<'_, str>> {
-    path.extension().map(|ext| ext.to_string_lossy())
 }
 
 impl Display for Libarchive {
