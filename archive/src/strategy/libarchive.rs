@@ -12,7 +12,7 @@ use super::*;
 
 lazy_static! {
     static ref SUPPORTED_EXTS: Vec<&'static str> =
-        vec![".zip", ".tar", ".tar.gz", ".tar.xz", ".tar.bz2"];
+        vec![".zip", ".tar", ".tar.gz", ".tar.xz", ".tar.bz2", ".rpm"];
 }
 
 /// The libarchive powered strategy: https://github.com/libarchive/libarchive.

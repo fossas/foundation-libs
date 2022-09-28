@@ -1,8 +1,13 @@
 //! Helpers for accessing testdata.
 
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use archive::{Destination, ProjectRoot, Target};
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 #[track_caller]
@@ -23,7 +28,34 @@ pub fn target(path: impl Into<PathBuf>) -> Target {
 #[track_caller]
 pub fn assert_content(dest: &Destination, expected: Vec<(&str, &[u8])>) {
     let dest = dest.inner();
-    let extracted = WalkDir::new(dest)
+
+    let extracted = HashMap::from_iter(file_content(dest));
+    let expected = map_expected(dest, expected);
+
+    assert_eq!(extracted, expected);
+}
+
+/// Assert the contents of the archive matched in the provided tree against the provided hashes.
+#[track_caller]
+pub fn assert_hashed_content(dest: &Destination, expected: Vec<(&str, &str)>) {
+    let dest = dest.inner();
+
+    let hashed = file_content(dest).map(|(path, content)| {
+        let mut hasher = Sha256::new();
+        hasher.update(&content);
+        let buf = &hasher.finalize()[..];
+        (path, hex::encode(buf))
+    });
+
+    let extracted = HashMap::from_iter(hashed);
+    let expected = map_expected(dest, expected);
+
+    assert_eq!(extracted, expected);
+}
+
+#[track_caller]
+fn file_content(dest: &Path) -> impl Iterator<Item = (PathBuf, Vec<u8>)> {
+    WalkDir::new(dest)
         .into_iter()
         .filter_map(|de| de.ok())
         .filter(|de| de.path().is_file())
@@ -35,13 +67,12 @@ pub fn assert_content(dest: &Destination, expected: Vec<(&str, &[u8])>) {
             Ok(content) => Some((path, content)),
             Err(_) => None,
         })
-        .collect::<HashMap<PathBuf, Vec<u8>>>();
+}
 
-    let expected = HashMap::from_iter(
+fn map_expected<T>(root: &Path, expected: Vec<(&str, impl Into<T>)>) -> HashMap<PathBuf, T> {
+    HashMap::from_iter(
         expected
             .into_iter()
-            .map(|(path, content)| (dest.join(path), content.to_vec())),
-    );
-
-    assert_eq!(extracted, expected);
+            .map(|(path, content)| (root.join(path), content.into())),
+    )
 }
