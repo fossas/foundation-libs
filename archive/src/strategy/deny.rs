@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use derive_more::Constructor;
-use tempfile::TempDir;
 
 use super::*;
 
@@ -12,7 +11,7 @@ pub struct Deny {
 }
 
 impl Strategy for Deny {
-    fn expand(&self, _: File) -> Result<TempDir, Error> {
+    fn expand(&self, _: File) -> Result<PathBuf, Error> {
         Err(Error::NotSupported)
     }
 

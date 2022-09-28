@@ -6,10 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bimap = "0.6.2"
 derivative = "2.2.0"
 derive_more = "0.99.17"
+duplicate = "0.4.1"
 getset = "0.1.2"
 tempfile = "3.3.0"
 thiserror = "1.0.36"
 typed-builder = "0.10.0"
 walkdir = "2.3.2"
+
+[dev-dependencies]
+mockall = "0.11.2"

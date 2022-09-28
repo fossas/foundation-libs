@@ -4,12 +4,17 @@
 #![deny(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+};
 
+use bimap::BiHashMap;
 use derivative::Derivative;
-use derive_more::{Deref, From};
+use derive_more::From;
+use duplicate::duplicate_item;
 use getset::Getters;
-use tempfile::TempDir;
 use typed_builder::TypedBuilder;
 
 mod error;
@@ -19,14 +24,15 @@ mod strategy;
 pub use error::*;
 
 /// Options for expanding archives.
-#[derive(Clone, Hash, Debug, Default, TypedBuilder, Derivative)]
+#[derive(Clone, Debug, Default, TypedBuilder, Derivative)]
 pub struct Options {
     /// The recursion strategy for archives.
     /// Files are always walked recursively; this setting solely controls archive expansion recursion.
     recursion: Recursion,
 
     /// Filters for file matching.
-    walk_filter: WalkFilter,
+    /// Currently unused.
+    _filter: Filter,
 
     /// The strategy for identifying expansion strategies for archives.
     identification: Identification,
@@ -111,28 +117,56 @@ pub enum Identification {
 /// This means the filters are wrong: the user probably wanted simply `include a/b/c`, without the exclude clause.
 /// This basic property of reduction-only filters leads to a fundamental rule:
 /// _if an item is both included and excluded, it is not included_.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, TypedBuilder)]
-pub struct WalkFilter {
+///
+/// # Filtering mechanics
+///
+/// Filtering is accomplished during the walk process. For each file or directory walked:
+/// - It is made relative to the scan root.
+/// - It is compared to the filters list.
+///
+/// A given path is considered "filtered" and not walked if one of the below are true:
+/// - The path is present in `exclude`. Directories matching `exclude` are skipped from being traversed.
+/// - `include` is not empty and neither the path nor any of its ancestors are present in `include`.
+///
+/// Files and directories inside archives are still compared to the filters.
+/// They trace their parent ancestry through the archive as though the archive were a directory.
+/// For example the following tree:
+/// ```not_rust
+/// root/
+///   foo/
+///     bar.zip/
+///       inner.rs
+/// ```
+#[derive(Clone, Eq, PartialEq, Debug, Default, TypedBuilder)]
+pub struct Filter {
     /// Paths provided here are included.
     ///
     /// Note that exclusion takes precedence; see parent doc comments for details.
     #[builder(setter(into))]
-    include: Vec<PathBuf>,
+    include: HashSet<PathBuf>,
 
     /// Paths provided here are not included.
     ///
     /// Note that exclusion takes precedence; see parent doc comments for details.
     #[builder(setter(into))]
-    exclude: Vec<PathBuf>,
+    exclude: HashSet<PathBuf>,
 }
 
 /// The results of expanding archives.
+///
+/// # Temporary directory deletion
+///
+/// **It is the responsibility of the caller to delete temporary directories when finished.**
+///
+/// `Destination` entries are always temporary. Two convenience methods exist to help with this:
+/// - `delete_destinations`: Deletes all destinations and clears the `locations` map.
+/// - `destinations`: List all destinations as a `HashSet`.
 #[derive(Debug, Getters, Default)]
 pub struct Expansion {
     /// Locations mapping a path discovered in the root (the [`Source`])
     /// to the location on the file system to which it was expanded (the [`Destination`]).
     #[getset(get = "pub")]
-    locations: HashMap<Source, Destination>,
+    locations: BiHashMap<Source, Destination>,
 
     /// Warnings encountered during the expansion process.
     ///
@@ -142,13 +176,36 @@ pub struct Expansion {
     warnings: HashMap<Source, Vec<Error>>,
 }
 
-/// The source at which an archive was discovered in the root during an expansion operation.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From, Deref)]
-pub struct Source(PathBuf);
+impl Expansion {
+    /// Delete all destinations and clear the `locations` map.
+    ///
+    /// If no errors are encountered the result is ok;
+    /// if any errors are encountered they are collected into the returned error list.
+    pub fn delete_destinations(&mut self) -> Result<(), Vec<Error>> {
+        let errors = self
+            .locations
+            .right_values()
+            .map(|d| d.inner().to_owned())
+            .fold(Vec::new(), |mut acc, destination| {
+                if let Err(error) = fs::remove_dir_all(&destination) {
+                    acc.push(Error::Cleanup { destination, error });
+                }
+                acc
+            });
 
-/// The destination to which an archive was expanded during an expansion operation.
-#[derive(Debug, From, Deref)]
-pub struct Destination(TempDir);
+        self.locations = BiHashMap::default();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// List all destinations.
+    pub fn list_destinations(&self) -> HashSet<Destination> {
+        self.locations.right_values().cloned().collect()
+    }
+}
 
 /// The target of an expansion operation.
 #[derive(Clone, Debug, TypedBuilder)]
@@ -156,11 +213,43 @@ pub struct Target {
     /// The root of the project within which `target` is being searched for archives to expand.
     /// Any walked path is joined with `project_root` and compared against the filters for inclusion.
     #[builder(setter(into))]
-    project_root: PathBuf,
+    project: ProjectRoot,
 
     /// The directory within `project_root` that is being expanded.
     #[builder(setter(into))]
     root: PathBuf,
+}
+
+/// The project root directory is a special instance of a file path with special meaning.
+/// It represents the root of the project in which archives in some subdir are being expanded.
+/// Paths are generated with the project root in mind and compared against the root for filtering.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
+pub struct ProjectRoot(PathBuf);
+
+/// The source at which an archive was discovered in the root during an expansion operation.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
+pub struct Source(PathBuf);
+
+/// The destination to which an archive was expanded during an expansion operation.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
+pub struct Destination(PathBuf);
+
+#[duplicate_item(
+    name          returns;
+    [Source]      [PathBuf];
+    [Destination] [PathBuf];
+    [ProjectRoot] [PathBuf];
+)]
+impl name {
+    /// Convert self into its inner value.
+    pub fn into_inner(self) -> returns {
+        self.0
+    }
+
+    /// Reference the inner value of self.
+    pub fn inner(&self) -> &returns {
+        &self.0
+    }
 }
 
 #[cfg(test)]
