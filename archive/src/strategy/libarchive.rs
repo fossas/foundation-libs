@@ -13,7 +13,7 @@ use tempfile::tempdir;
 use super::*;
 
 lazy_static! {
-    static ref SUPPORTED_EXTS: HashSet<&'static str> = HashSet::from(["zip"]);
+    static ref SUPPORTED_EXTS: HashSet<&'static str> = HashSet::from(["zip", "tar"]);
 }
 
 /// The libarchive powered strategy: https://github.com/libarchive/libarchive.
