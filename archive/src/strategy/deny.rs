@@ -19,3 +19,9 @@ impl Strategy for Deny {
         Err(Error::NotSupported)
     }
 }
+
+impl Display for Deny {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "deny")
+    }
+}

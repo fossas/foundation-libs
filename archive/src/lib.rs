@@ -208,15 +208,17 @@ impl Expansion {
 }
 
 /// The target of an expansion operation.
-#[derive(Clone, Debug, TypedBuilder)]
+#[derive(Clone, Debug, TypedBuilder, Getters)]
 pub struct Target {
     /// The root of the project within which `target` is being searched for archives to expand.
     /// Any walked path is joined with `project_root` and compared against the filters for inclusion.
     #[builder(setter(into))]
+    #[getset(get = "pub")]
     project: ProjectRoot,
 
     /// The directory within `project_root` that is being expanded.
     #[builder(setter(into))]
+    #[getset(get = "pub")]
     root: PathBuf,
 }
 
@@ -235,19 +237,24 @@ pub struct Source(PathBuf);
 pub struct Destination(PathBuf);
 
 #[duplicate_item(
-    name          returns;
+    name          internal;
     [Source]      [PathBuf];
     [Destination] [PathBuf];
     [ProjectRoot] [PathBuf];
 )]
 impl name {
+    /// Create a new instance of self.
+    pub fn new(inner: impl Into<internal>) -> Self {
+        Self(inner.into())
+    }
+
     /// Convert self into its inner value.
-    pub fn into_inner(self) -> returns {
+    pub fn into_inner(self) -> internal {
         self.0
     }
 
     /// Reference the inner value of self.
-    pub fn inner(&self) -> &returns {
+    pub fn inner(&self) -> &internal {
         &self.0
     }
 }

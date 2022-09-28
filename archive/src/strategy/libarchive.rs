@@ -1,10 +1,20 @@
-use std::path::Path;
+use std::{
+    borrow::Cow,
+    collections::HashSet,
+    io::{Read, Seek, SeekFrom},
+    path::Path,
+};
 
 use compress_tools::{uncompress_archive, Ownership};
 use derive_more::Constructor;
+use lazy_static::lazy_static;
 use tempfile::tempdir;
 
 use super::*;
+
+lazy_static! {
+    static ref SUPPORTED_EXTS: HashSet<&'static str> = HashSet::from(["zip"]);
+}
 
 /// The libarchive powered strategy: https://github.com/libarchive/libarchive.
 /// Formats: https://github.com/libarchive/libarchive#supported-formats
@@ -12,7 +22,7 @@ use super::*;
 /// Try to decompress everything that doesn't have a better strategy with this strategy.
 #[derive(Copy, Clone, Debug, Default, Constructor)]
 pub struct Libarchive {
-    _identification: Identification,
+    identification: Identification,
 }
 
 impl Strategy for Libarchive {
@@ -25,7 +35,55 @@ impl Strategy for Libarchive {
     }
 
     fn can_expand(&self, path: &Path) -> Result<File, Error> {
-        let handle = File::open(path)?;
-        Ok(handle)
+        // libarchive happily "expands" things that are not archives:
+        //
+        // ```not_rust
+        // DEBUG archive::strategy > attempting to expand entry: "/var/folders/q7/3nvvpy0d6js28m8lypw3tcx80000gn/T/.tmpOWi7Zw/simple/b.txt"
+        // DEBUG archive::strategy > expanded to "/var/folders/q7/3nvvpy0d6js28m8lypw3tcx80000gn/T/.tmpyXNng0"
+        // ```
+        //
+        // So only pass things that look like archives to it.
+        if self.identification == Identification::MatchExtension {
+            if ext_is_supported(path) {
+                File::open(path).map_err(Error::IO)
+            } else {
+                Err(Error::NotSupported)
+            }
+        } else {
+            let mut handle = File::open(path)?;
+            let supported = content_is_binary(&mut handle)?;
+            if supported {
+                handle.seek(SeekFrom::Start(0))?;
+                Ok(handle)
+            } else {
+                Err(Error::NotSupported)
+            }
+        }
+    }
+}
+
+/// Inspect the file to determine if it is binary.
+///
+/// Uses the same method as git: "is there a zero byte in the first 8000 bytes of the file"
+fn content_is_binary<R: Read>(stream: &mut R) -> Result<bool, io::Error> {
+    let mut buf = Vec::new();
+    stream.take(8000).read_to_end(&mut buf)?;
+    Ok(buf.contains(&0))
+}
+
+fn ext_is_supported(path: &Path) -> bool {
+    match safe_ext(path) {
+        Some(ext) => SUPPORTED_EXTS.contains(ext.as_ref()),
+        None => false,
+    }
+}
+
+fn safe_ext(path: &'_ Path) -> Option<Cow<'_, str>> {
+    path.extension().map(|ext| ext.to_string_lossy())
+}
+
+impl Display for Libarchive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "libarchive")
     }
 }

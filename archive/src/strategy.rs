@@ -1,14 +1,12 @@
 //! Strategies for expanding archives.
 
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::{fs::File, io, path::Path};
 
 use derive_more::Constructor;
-#[cfg(test)]
-use mockall::predicate::*;
-#[cfg(test)]
-use mockall::*;
 
+use log::debug;
 use thiserror::Error;
 use walkdir::WalkDir;
 
@@ -49,8 +47,7 @@ pub(crate) struct Attempt {
 }
 
 /// Describes a strategy used to expand an archive.
-#[cfg_attr(test, automock)]
-pub trait Strategy {
+pub trait Strategy: Display {
     /// Expand an archive at the provided path into a new temporary directory.
     fn expand(&self, archive: File) -> Result<PathBuf, Error>;
 
@@ -61,6 +58,18 @@ pub trait Strategy {
 /// Strategies monomorphized to the identification method used for an expand invocation.
 pub struct List {
     strategies: Vec<Box<dyn Strategy>>,
+}
+
+impl Display for List {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let names = self
+            .strategies
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "Strategies [{names}]")
+    }
 }
 
 impl List {
@@ -98,19 +107,36 @@ impl List {
         dir: &Path,
         include: impl Fn(&Path) -> bool,
     ) -> Result<Vec<Attempt>, Error> {
+        debug!("expanding layer at {dir:?}");
         let mut stack = Vec::new();
         let walker = WalkDir::new(&dir)
             .follow_links(false)
             .into_iter()
-            .filter_entry(|e| include(e.path()));
+            .filter_entry(|e| {
+                let included = include(e.path());
+                debug!("entry {:?} included in filter: {included}", e.path());
+                included
+            });
 
         for entry in walker {
             let entry = entry?;
-            let extracted = self.expand(entry.path());
-            if let Err(Error::NotSupported) = extracted {
+            if entry.path().is_file() {
+                debug!("attempting to expand entry: {:?}", entry.path());
+            } else {
+                debug!("entry {:?} is not a file", entry.path());
                 continue;
             }
 
+            let extracted = self.expand(entry.path());
+            if let Err(Error::NotSupported) = extracted {
+                debug!("entry is not an archive or is not supported");
+                continue;
+            }
+
+            match extracted {
+                Ok(ref to) => debug!("expanded to {to:?}"),
+                Err(ref err) => debug!("failed to expand: {err}"),
+            }
             stack.push(Attempt::new(entry.into_path(), extracted));
         }
 
