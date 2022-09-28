@@ -11,7 +11,7 @@ use tempfile::tempdir;
 use super::*;
 
 lazy_static! {
-    static ref SUPPORTED_EXTS: Vec<&'static str> = vec![".zip", ".tar", ".tar.gz"];
+    static ref SUPPORTED_EXTS: Vec<&'static str> = vec![".zip", ".tar", ".tar.gz", ".tar.xz"];
 }
 
 /// The libarchive powered strategy: https://github.com/libarchive/libarchive.
