@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bimap = "0.6.2"
+compress-tools = "0.13.0"
 derivative = "2.2.0"
 derive_more = "0.99.17"
 duplicate = "0.4.1"

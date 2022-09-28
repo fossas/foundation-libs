@@ -15,8 +15,10 @@ use walkdir::WalkDir;
 use crate::Identification;
 
 use self::deny::Deny;
+use self::libarchive::Libarchive;
 
 mod deny;
+mod libarchive;
 
 /// Errors encountered during archive expansion.
 #[derive(Debug, Error)]
@@ -33,6 +35,10 @@ pub enum Error {
     /// Generic IO error while reading the archive.
     #[error("generic io")]
     IO(#[from] io::Error),
+
+    /// Libarchive expansion failed.
+    #[error("libarchive strategy")]
+    Libarchive(#[from] compress_tools::Error),
 }
 
 /// The result of attempting to extract a given path.
@@ -61,7 +67,10 @@ impl List {
     /// Create a new set of strategies with the provided identification strategy.
     pub fn new(identification: Identification) -> Self {
         Self {
-            strategies: vec![Box::new(Deny::new(identification))],
+            strategies: vec![
+                Box::new(Libarchive::new(identification)),
+                Box::new(Deny::new(identification)),
+            ],
         }
     }
 
