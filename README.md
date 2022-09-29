@@ -1,3 +1,9 @@
+<div align="center">
+
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B1%2Fgithub.com%2Ffossas%2Ffoundation-libs.svg?type=small)](https://app.fossa.com/projects/custom%2B1%2Fgithub.com%2Ffossas%2Ffoundation-libs?ref=badge_small)
+
+</div>
+
 # foundation-libs
 
 Foundational libraries for cross-language support, written in Rust.
