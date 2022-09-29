@@ -1,13 +1,16 @@
-name: test
-on: [pull_request]
+name: Linux
+
+on: pull_request
 
 jobs:
-  all:
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ubuntu-20.04
 
     steps:
       # Install system dependencies
-      - run: sudo apt-get update; sudo apt-get install libarchive-dev
+      - run: |
+          vcpkg integrate install
+          vcpkg install libarchive:x64-windows-static
 
       # Set up repo and toolchain
       - uses: actions/checkout@v2
@@ -20,6 +23,7 @@ jobs:
       - run: cargo generate-lockfile
       - uses: Swatinem/rust-cache@v1.3.0
       
-      # Test
+      # Check and test
       - uses: taiki-e/install-action@nextest
+      - run: cargo check --release --all --bins --examples --tests
       - run: cargo nextest run

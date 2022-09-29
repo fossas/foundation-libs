@@ -1,10 +1,10 @@
-name: test
-on: [pull_request]
+name: Style
+
+on: pull_request
 
 jobs:
-  all:
-    runs-on: ubuntu-latest
-
+  style:
+    runs-on: ubuntu-20.04
     steps:
       # Install system dependencies
       - run: sudo apt-get update; sudo apt-get install libarchive-dev
@@ -15,11 +15,8 @@ jobs:
         with:
           toolchain: stable
           profile: minimal
-
-      # Need a lock file for caching
-      - run: cargo generate-lockfile
-      - uses: Swatinem/rust-cache@v1.3.0
+          components: clippy, rustfmt
       
-      # Test
-      - uses: taiki-e/install-action@nextest
-      - run: cargo nextest run
+      # Check
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-features --all --tests -- -D clippy::all
