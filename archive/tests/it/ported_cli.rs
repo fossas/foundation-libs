@@ -19,10 +19,12 @@ fn extract_simple_zip() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().join("simple.zip")))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_content(
-        destination,
+        &destination,
         vec![
             ("simple/a.txt", b"6b5effe3-215a-49ec-9286-f0702f7eb529"),
             ("simple/b.txt", b"8dea86e4-4365-4711-872b-6f652b02c8d9"),
@@ -44,10 +46,12 @@ fn extract_simple_tar() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().to_owned()))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_content(
-        destination,
+        &destination,
         vec![
             ("simple/a.txt", b"6b5effe3-215a-49ec-9286-f0702f7eb529"),
             ("simple/b.txt", b"8dea86e4-4365-4711-872b-6f652b02c8d9"),
@@ -69,10 +73,12 @@ fn extract_simple_tar_gz() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().to_owned()))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_content(
-        destination,
+        &destination,
         vec![
             ("simple/a.txt", b"6b5effe3-215a-49ec-9286-f0702f7eb529"),
             ("simple/b.txt", b"8dea86e4-4365-4711-872b-6f652b02c8d9"),
@@ -94,10 +100,12 @@ fn extract_simple_tar_xz() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().to_owned()))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_content(
-        destination,
+        &destination,
         vec![
             ("simple/a.txt", b"6b5effe3-215a-49ec-9286-f0702f7eb529"),
             ("simple/b.txt", b"8dea86e4-4365-4711-872b-6f652b02c8d9"),
@@ -119,10 +127,12 @@ fn extract_simple_tar_bz2() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().to_owned()))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_content(
-        destination,
+        &destination,
         vec![
             ("simple/a.txt", b"6b5effe3-215a-49ec-9286-f0702f7eb529"),
             ("simple/b.txt", b"8dea86e4-4365-4711-872b-6f652b02c8d9"),
@@ -144,10 +154,12 @@ fn extract_el7_rpm() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().to_owned()))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_hashed_content(
-        destination,
+        &destination,
         vec![
             (
                 "usr/bin/curl",
@@ -215,10 +227,12 @@ fn extract_fc35_rpm() {
     let destination = result
         .locations()
         .get_by_left(&Source::from(target.root().to_owned()))
-        .unwrap();
+        .unwrap()
+        .inner()
+        .clone();
 
     testdata::assert_hashed_content(
-        destination,
+        &destination,
         vec![
             (
                 "usr/bin/curl",

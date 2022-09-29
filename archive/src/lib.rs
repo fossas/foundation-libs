@@ -6,7 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs,
+    fs, mem,
     path::PathBuf,
 };
 
@@ -156,11 +156,18 @@ pub struct Filter {
 ///
 /// # Temporary directory deletion
 ///
-/// **It is the responsibility of the caller to delete temporary directories when finished.**
+/// Directories, represented by `Destination` entries in `locations`,
+/// are deleted automatically when `Expansion` goes out of scope.
 ///
-/// `Destination` entries are always temporary. Two convenience methods exist to help with this:
-/// - `delete_destinations`: Deletes all destinations and clears the `locations` map.
-/// - `destinations`: List all destinations as a `HashSet`.
+/// It is the user's responsibility to ensure that no further interaction is attempted after dropping `Expansion`.
+///
+/// - To avoid automatically deleting the temporary directories, use `persist`.
+/// - Automatic cleanup doesn't allow the user to view potential errors; to view cleanup errors use `cleanup` directly.
+///
+/// # Resource leaking
+///
+/// Various platform-specific conditions may cause `Expansion` to fail to delete the underlying directory.
+/// It is also possible to prevent cleanup via segfault, SIGINT, `std::process::exit` or similar.
 #[derive(Debug, Getters, Default)]
 pub struct Expansion {
     /// Locations mapping a path discovered in the root (the [`Source`])
@@ -176,12 +183,41 @@ pub struct Expansion {
     warnings: HashMap<Source, Vec<Error>>,
 }
 
+impl Drop for Expansion {
+    fn drop(&mut self) {
+        let _ = self.cleanup();
+    }
+}
+
 impl Expansion {
+    /// Persist the temporary directories to disk, returning the contents of `Self` as a tuple.
+    ///
+    /// This consumes the `Expansion` without deleting temporary directories on the file system,
+    /// meaning that they are no longer automatically deleted.
+    pub fn persist(self) -> (BiHashMap<Source, Destination>, HashMap<Source, Vec<Error>>) {
+        let mut this = mem::ManuallyDrop::new(self);
+        (
+            mem::take(&mut this.locations),
+            mem::take(&mut this.warnings),
+        )
+    }
+
     /// Delete all destinations and clear the `locations` map.
     ///
     /// If no errors are encountered the result is ok;
     /// if any errors are encountered they are collected into the returned error list.
-    pub fn delete_destinations(&mut self) -> Result<(), Vec<Error>> {
+    ///
+    /// This function is equivalent to causing `Expansion` to be dropped by letting it go out of scope;
+    /// the intention with this function is to enable checking for cleanup errors when desired.
+    ///
+    /// It is supported to call `cleanup` multiple times; subsequent operations are a no-op,
+    /// regardless whether the first call to `cleanup` was fully successful.
+    pub fn cleanup(&mut self) -> Result<(), Vec<Error>> {
+        // Special case for when dropped after manually running `cleanup`.
+        if self.locations.is_empty() {
+            return Ok(());
+        }
+
         let errors = self
             .locations
             .right_values()
@@ -202,7 +238,7 @@ impl Expansion {
     }
 
     /// List all destinations.
-    pub fn list_destinations(&self) -> HashSet<Destination> {
+    pub fn destinations(&self) -> HashSet<Destination> {
         self.locations.right_values().cloned().collect()
     }
 }

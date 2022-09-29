@@ -13,5 +13,6 @@
 //!
 //! Tests in this module set up env_logger; use `RUST_LOG=debug` to see its output.
 
+mod local;
 mod ported_cli;
 mod testdata;

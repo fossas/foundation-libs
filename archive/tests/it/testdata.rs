@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use archive::{Destination, ProjectRoot, Target};
+use archive::{ProjectRoot, Target};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
@@ -26,9 +26,7 @@ pub fn target(path: impl Into<PathBuf>) -> Target {
 
 /// Assert the contents of the archive matched the provided tree.
 #[track_caller]
-pub fn assert_content(dest: &Destination, expected: Vec<(&str, &[u8])>) {
-    let dest = dest.inner();
-
+pub fn assert_content(dest: &Path, expected: Vec<(&str, &[u8])>) {
     let extracted = HashMap::from_iter(file_content(dest));
     let expected = map_expected(dest, expected);
 
@@ -37,9 +35,7 @@ pub fn assert_content(dest: &Destination, expected: Vec<(&str, &[u8])>) {
 
 /// Assert the contents of the archive matched in the provided tree against the provided hashes.
 #[track_caller]
-pub fn assert_hashed_content(dest: &Destination, expected: Vec<(&str, &str)>) {
-    let dest = dest.inner();
-
+pub fn assert_hashed_content(dest: &Path, expected: Vec<(&str, &str)>) {
     let hashed = file_content(dest).map(|(path, content)| {
         let mut hasher = Sha256::new();
         hasher.update(&content);
