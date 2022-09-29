@@ -1,16 +1,15 @@
-name: Linux
+name: macOS
 
 on: pull_request
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-20.04
+    runs-on: macOS-latest
 
     steps:
       # Install system dependencies
       - run: |
-          brew install pkgconfig
-          brew install libarchive
+          brew install pkgconfig libarchive
           echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||') >> $GITHUB_ENV
 
       # Set up repo and toolchain
