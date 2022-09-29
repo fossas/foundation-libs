@@ -1,4 +1,4 @@
-name: Linux
+name: linux
 
 on: pull_request
 
@@ -9,8 +9,8 @@ jobs:
     steps:
       # Install system dependencies
       - run: |
-        sudo apt-get update
-        sudo apt-get install -y libarchive-dev build-essential nettle-dev libacl1-dev libbz2-dev liblzma-dev liblz4-dev libzstd-dev lzop zlib1g-dev
+          sudo apt-get update
+          sudo apt-get install -y libarchive-dev build-essential nettle-dev libacl1-dev libbz2-dev liblzma-dev liblz4-dev libzstd-dev lzop zlib1g-dev
 
       # Set up repo and toolchain
       - uses: actions/checkout@v2
