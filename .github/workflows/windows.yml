@@ -7,10 +7,26 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # Cache vcpkg database
+      - uses: actions/cache@v3
+        with:
+          path: $VCPKG_ROOT/installed
+          key: ${{ runner.os }}-vcpkg-cache-x64-windows-static
+        env:
+          VCPKG_ROOT: "C:\vcpkg"
+      - uses: actions/cache@v3
+        with:
+          path: $VCPKG_ROOT/downloads
+          key: ${{ runner.os }}-vcpkg-cache-x64-windows-static
+        env:
+          VCPKG_ROOT: "C:\vcpkg"
+
       # Install system dependencies
       - run: |
           vcpkg integrate install
           vcpkg install libarchive:x64-windows-static
+        env:
+          VCPKG_ROOT: "C:\vcpkg"
 
       # Set up repo and toolchain
       - uses: actions/checkout@v2
