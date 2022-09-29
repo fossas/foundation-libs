@@ -66,11 +66,11 @@ pub enum InvariantError {
 ///
 /// This is because fingerprints form the backbone of how VSI operates:
 /// - FOSSA CLI creates them.
-/// - The VSI Forensics Service ("Sherlock") assumes certain things about them.
-/// - The VSI Cloud Store ("Multivac") assumes certain things about them.
-/// - The VSI Cloud Store's Crawlers ("Azathoth") creates them.
-/// - Azathoth and FOSSA CLI must create them in the same way.
-/// - ... and all of this has to be compatible with Ramjet's fingerprinting, which formed the initial basis of VSI.
+/// - The VSI Forensics Service assumes certain things about them.
+/// - The VSI Cloud Store assumes certain things about them.
+/// - The VSI Cloud Store's Crawlers create them.
+/// - Crawlers and FOSSA CLI must create them in the same way.
+/// - ... and all of this has to be compatible with the fingerprinting in the MVP store, which formed the initial basis of VSI.
 ///
 /// All valid fingerprint kinds implement this trait.
 ///
@@ -82,15 +82,15 @@ pub enum InvariantError {
 /// across a serialization boundary, because `Kind`s aren't concrete and therefore aren't
 /// generally serializable.
 ///
-/// Specifically, this is an issue for `FinalizeRevision` and `CheckRevision` methods in Multivac,
+/// Specifically, this is an issue for `FinalizeRevision` and `CheckRevision` methods in the VSI Cloud Store,
 /// where it's not simple to send a list of `Kind`s used to fingerprint a set of files,
 /// and it's not simple to then retreive that list from the API.
 ///
-/// Instead, for `FinalizeRevision`, Multivac clients are forced to:
+/// Instead, for `FinalizeRevision`, clients are forced to:
 /// - Know what kinds of fingerprints are possible, separately.
 /// - Manually call `.to_string` on those kinds to get a list of kinds used.
 /// - Send them as opaque strings.
-/// And for `CheckRevision`, Multivac clients are forced to:
+/// And for `CheckRevision`, clients are forced to:
 /// - Manually compare the API result (which is a set of opaque strings) against known kinds, using the `to_string` method.
 /// And the server is required to treat all this as opaque strings.
 ///
@@ -107,7 +107,7 @@ pub trait Kind: private::Sealed {}
 /// generally require specific circumstances: `CommentStrippedSHA256` requires that the file is text, and
 /// hypothetical future fingerprint kinds such as something based on an AST would require that the file is source code.
 ///
-/// This fingerprint kind has been finalized and may not change.
+/// This fingerprint kind has been finalized and may not change (except to fix a bug).
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
 pub struct RawSHA256;
 
@@ -123,7 +123,7 @@ impl Display for RawSHA256 {
 /// Represents a fingerprint derived by hashing the contents of a file with the SHA256 algorithm
 /// after performing basic C-style comment stripping.
 ///
-/// This fingerprint kind has been finalized and may not change.
+/// This fingerprint kind has been finalized and may not change (except to fix a bug).
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
 pub struct CommentStrippedSHA256;
 
