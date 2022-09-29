@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "archive",
-  "fingerprint"
+  "berkeleydb",
+  "fingerprint",
 ]
 
 [profile.dev.package.backtrace]
