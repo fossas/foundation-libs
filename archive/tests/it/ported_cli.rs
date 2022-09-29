@@ -200,3 +200,79 @@ fn extract_el7_rpm() {
         ],
     );
 }
+
+/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L123-L129
+#[test]
+fn extract_fc35_rpm() {
+    pretty_env_logger::init();
+
+    let target = testdata::target("testdata/curl-7.78.0-3.fc35.x86_64.rpm");
+    let opts = Options::default();
+
+    let result = expand::all(target.clone(), opts).unwrap();
+    debug!("extracted: {:?}", result.locations());
+
+    let destination = result
+        .locations()
+        .get_by_left(&Source::from(target.root().to_owned()))
+        .unwrap();
+
+    testdata::assert_hashed_content(
+        destination,
+        vec![
+            (
+                "usr/bin/curl",
+                "f44294f0cb31bdbddd7dde93702a98dc9de60a0c0207f0e7ee6df7631a9ae641",
+            ),
+            (
+                // This is actually different than the one in CLI: https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L179
+                // But as far as I can tell, this is accurate:
+                // ```
+                // ; tar -xf testdata/curl-7.78.0-3.fc35.x86_64.rpm -C fc45
+                // ; shasum /var/folders/q7/3nvvpy0d6js28m8lypw3tcx80000gn/T/.tmp4C7dnS/usr/lib/.build-id/b3/1694338b7ba8cedd532408473dbac8ebe509c5
+                // 7611d80ac0d2bfa314bcb60092c6e70050850ac9  /var/folders/q7/3nvvpy0d6js28m8lypw3tcx80000gn/T/.tmp4C7dnS/usr/lib/.build-id/b3/1694338b7ba8cedd532408473dbac8ebe509c5
+                // ; shasum /var/folders/q7/3nvvpy0d6js28m8lypw3tcx80000gn/T/.tmp4C7dnS/usr/bin/curl
+                // 7611d80ac0d2bfa314bcb60092c6e70050850ac9  /var/folders/q7/3nvvpy0d6js28m8lypw3tcx80000gn/T/.tmp4C7dnS/usr/bin/curl
+                // ```
+                "usr/lib/.build-id/b3/1694338b7ba8cedd532408473dbac8ebe509c5",
+                "f44294f0cb31bdbddd7dde93702a98dc9de60a0c0207f0e7ee6df7631a9ae641",
+            ),
+            (
+                "usr/share/man/man1/curl.1.gz",
+                "e3ab38e59cda834a11cee0ae4659dc6d609d8ed1f3e3c80dcd0d28cb56908d4c",
+            ),
+            (
+                "usr/share/doc/curl/BUGS.md",
+                "c5fc32214134097232490fa9e0d3cd1f299b04f5e550c2bfc8ff081ff29f0836",
+            ),
+            (
+                "usr/share/doc/curl/FAQ",
+                "d00231e857aa821f9ca1519681463fafea852bb437c9b0ca49ab341bdee04b55",
+            ),
+            (
+                "usr/share/doc/curl/CHANGES",
+                "0ab7f82274290a06b6a5d78dab3097c8a589d1f77325e64be32599c522b7dd96",
+            ),
+            (
+                "usr/share/doc/curl/TheArtOfHttpScripting.md",
+                "600d0796844ccf177b452d2f3abed65eb1f454c2685381d479f76c2dafc83789",
+            ),
+            (
+                "usr/share/doc/curl/README",
+                "ce118b51897f4452dcbe7d2042f05222fd2a8c0362ca177b3cd6c6fb3a335548",
+            ),
+            (
+                "usr/share/doc/curl/TODO",
+                "06e052269d2ec3f08b65e257d7b65609e3b678c0e2143c4410ca667c097baa2b",
+            ),
+            (
+                "usr/share/doc/curl/FEATURES.md",
+                "ceecb9363eb82c80a7096064d01f89abf2149c3e66b92674966f2707dd10b83a",
+            ),
+            (
+                "usr/share/zsh/site-functions/_curl",
+                "ee8fe9041235e96a89c66ab3accc6f6bb6a9cc473566031c51fb0553d830f258",
+            ),
+        ],
+    );
+}
