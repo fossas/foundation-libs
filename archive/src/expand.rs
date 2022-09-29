@@ -1,33 +1,10 @@
 //! Archive expansion functionality.
 
-use derive_more::Constructor;
+use log::debug;
 use std::{collections::VecDeque, path::Path};
-use walkdir::WalkDir;
 
 use super::*;
-
-/// Wrap elements of the provided iterator into a tuple,
-/// where the first element is the depth and the second is the original iterator item.
-macro_rules! extend_at_depth {
-    ($depth:expr, $stack:expr, $iter:expr) => {
-        $stack.extend($iter.into_iter().map(|p| ($depth, p)))
-    };
-}
-
-/// Pushes a warning for the provided path into the warnings map.
-macro_rules! warn {
-    ($warnings:ident, $path:ident, $err:expr) => {{
-        let errs = $warnings.entry(Source::from($path)).or_insert(vec![]);
-        errs.push($err.into());
-    }};
-}
-
-/// Records a source and destination.
-macro_rules! record {
-    ($locations:ident, $source:ident, $destination:ident) => {{
-        $locations.insert(Source::from($source), Destination::from($destination));
-    }};
-}
+use strategy::Attempt;
 
 /// Expand all the archives in the provided `target`.
 ///
@@ -36,98 +13,104 @@ macro_rules! record {
 ///
 /// Any walked path is joined with `project` and then compared against the filters for inclusion.
 pub fn all(target: Target, options: Options) -> Result<Expansion, Error> {
+    debug!("Expanding {target:?} with {options:?}");
+
     // Special case: don't try to scan a directory outside the project root.
-    if !has_ancestor(&target.project_root, &target.root) {
+    if !has_ancestor(target.project.inner(), &target.root) {
+        debug!("{:?} is not a child of {:?}", target.root, target.project);
         return invariant!(TargetProjectSubdir, target);
     }
 
     // Special case: if root is a link, error.
     if target.root.is_symlink() {
+        debug!("{:?} is a symlink", target.root);
         return invariant!(TargetSymlink, target);
     }
 
     // Build strategies depending on the identification type.
     // Strategies can use this however they wish.
     let strategies = strategy::List::new(options.identification);
+    debug!("using {strategies}");
 
     // Stack of recursive archives to walk, and the results of the walk.
-    // Rust doesn't do well with recursive function calls; instead build a stack manually.
+    // Using a manual stack because Rust doesn't do super well with recursive function calls (it's missing TCE).
     let mut stack = VecDeque::new();
+    let mut expansion = Expansion::default();
 
     // Branch based on whether the initial path is an archive or a directory.
     if target.root.is_dir() {
-        let extracted = expand_in_dir(&strategies, &target.root)?;
-        extend_at_depth!(0, stack, extracted);
+        debug!("{:?} is a directory", target.root);
+        let extracted = strategies.expand_layer(&target.root, noop_filter)?;
+        stack.extend(extracted.into_iter().map(|p| (0, p)));
     } else if target.root.is_file() {
+        debug!("{:?} is a file, treating as an archive", target.root);
         let extracted = strategies.expand(&target.root);
         stack.push_back((0, Attempt::new(target.root, extracted)));
     } else {
+        debug!("{:?} is neither directory nor file", target.root);
         return invariant!(Walkable, target);
     }
 
     // Iterate through the stack,
     // converting it to locations (successful extractions)
     // or warnings (failed extractions).
-    let mut locations = HashMap::new();
-    let mut warnings = HashMap::new();
-
-    // Branch on whether recursion is enabled.
-    if let Recursion::Enabled { depth: max_depth } = options.recursion {
-        // As mentioned, Rust doesn't do well with recursive function calls.
-        // Work through the stack, building the results and sometimes adding to the stack as new archives are found.
-        while let Some((depth, Attempt { source, result })) = stack.pop_front() {
-            if depth >= max_depth {
-                warn!(warnings, source, Error::RecursionLimit);
-                continue;
-            }
-
-            match result {
-                Ok(destination) => {
-                    let next = expand_in_dir(&strategies, destination.path())?;
-                    record!(locations, source, destination);
-                    extend_at_depth!(depth + 1, stack, next);
+    //
+    // The stack grows as new archives are discovered and expanded.
+    match options.recursion {
+        Recursion::Enabled { depth: max_depth } => {
+            debug!("recursing (max depth '{max_depth}')");
+            while let Some((depth, attempt)) = stack.pop_front() {
+                debug!("recording at depth '{depth}': {attempt:?}");
+                if depth >= max_depth {
+                    debug!("recursion limit reached!");
+                    expansion.warn(attempt.source, Error::RecursionLimit);
+                    continue;
                 }
-                Err(err) => warn!(warnings, source, err),
+
+                let expanded = attempt.result.as_ref().map(|d| d.to_owned()).ok();
+                expansion.record(attempt);
+
+                if let Some(next_path) = expanded {
+                    let depth = depth + 1;
+                    let next = strategies.expand_layer(&next_path, noop_filter)?;
+                    stack.extend(next.into_iter().map(|p| (depth, p)));
+                }
             }
         }
-    } else {
-        while let Some((_, Attempt { source, result })) = stack.pop_front() {
-            match result {
-                Ok(destination) => record!(locations, source, destination),
-                Err(err) => warn!(warnings, source, err),
+        Recursion::Disabled => expansion.record_many(stack.into_iter().map(|(_, b)| b)),
+    }
+
+    debug!("finished expanding");
+    Ok(expansion)
+}
+
+impl Expansion {
+    fn record(&mut self, attempt: Attempt) {
+        match attempt.result {
+            Ok(destination) => {
+                self.locations
+                    .insert(attempt.source.into(), destination.into());
+            }
+            Err(err) => {
+                self.warn(attempt.source, err.into());
             }
         }
     }
 
-    Ok(Expansion {
-        warnings,
-        locations,
-    })
-}
-
-/// The result of attempting to extract a given path.
-#[derive(Debug, Constructor)]
-struct Attempt {
-    source: PathBuf,
-    result: Result<TempDir, strategy::Error>,
-}
-
-fn expand_in_dir(strats: &strategy::List, dir: &Path) -> Result<Vec<Attempt>, Error> {
-    let mut stack = Vec::new();
-
-    for entry in WalkDir::new(&dir).follow_links(false) {
-        let entry = entry?;
-        let extracted = strats.expand(entry.path());
-        if let Err(strategy::Error::NotSupported) = extracted {
-            continue;
-        }
-
-        stack.push(Attempt::new(entry.into_path(), extracted));
+    fn warn(&mut self, source: PathBuf, warning: Error) {
+        let errs = self.warnings.entry(Source::from(source)).or_insert(vec![]);
+        errs.push(warning);
     }
 
-    Ok(stack)
+    fn record_many(&mut self, attempts: impl Iterator<Item = Attempt>) {
+        attempts.into_iter().for_each(|a| self.record(a))
+    }
 }
 
 fn has_ancestor(ancestor: &Path, child: &Path) -> bool {
     child.ancestors().any(|parent| parent == ancestor)
+}
+
+fn noop_filter(_: &Path) -> bool {
+    true
 }

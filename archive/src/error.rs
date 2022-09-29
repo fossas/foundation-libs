@@ -1,3 +1,5 @@
+use std::{io, path::PathBuf};
+
 use thiserror::Error;
 
 use crate::{strategy, Target};
@@ -22,12 +24,23 @@ pub enum Error {
     Invariant(#[from] Invariant),
 
     /// Unable to walk entries.
-    #[error("walk dir")]
+    #[error(transparent)]
     Walk(#[from] walkdir::Error),
 
     /// Unable to expand an archive.
     #[error("expand")]
     Expand(#[from] strategy::Error),
+
+    /// Unable to remove a [`Destination`].
+    #[error("cleanup destination {destination:?}")]
+    Cleanup {
+        /// The destination directory that failed to be cleaned up.
+        destination: PathBuf,
+
+        /// The error encountered when attempting to clean up the directory.
+        #[source]
+        error: io::Error,
+    },
 
     /// Reached the recursion limit.
     #[error("recursion limit")]
@@ -39,7 +52,7 @@ pub enum Error {
 #[non_exhaustive]
 pub enum Invariant {
     /// The target is not a subdirectory of the project root.
-    #[error("target {:?} is not a subdirectory of project root {:?}", target.root, target.project_root)]
+    #[error("target {:?} is not a subdirectory of project root {:?}", target.root, target.project)]
     TargetProjectSubdir {
         /// The target provided to the archive expansion function.
         target: Target,
