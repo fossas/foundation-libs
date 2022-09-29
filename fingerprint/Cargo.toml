@@ -11,10 +11,8 @@ hex = "0.4.3"
 iter-read = "0.3.1"
 serde = { version = "1.0.140", features = ["derive"] }
 thiserror = "1.0.31"
-[target.'cfg(target_env = "msvc")'.dependencies]
+# TODO: Figure out how to get this building with ASM in Windows.
 sha2 = "0.10.2"
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-sha2 = { version = "0.10.2", features = ["asm"] } 
 
 [dev-dependencies]
 typed-builder = "0.10.0"
