@@ -7,12 +7,8 @@ edition = "2021"
 [features]
 default = []
 
-# Include dependencies required for building the `archive` binary.
-bin = ["dep:clap", "dep:stable-eyre"]
-
 [dependencies]
 bimap = "0.6.2"
-clap = { version = "4.0.0", optional = true }
 compress-tools = "0.13.0"
 derivative = "2.2.0"
 derive_more = "0.99.17"
@@ -20,7 +16,6 @@ duplicate = "0.4.1"
 getset = "0.1.2"
 lazy_static = "1.4.0"
 log = "0.4.17"
-stable-eyre = { version = "0.2.2", optional = true }
 tempfile = "3.3.0"
 thiserror = "1.0.36"
 typed-builder = "0.10.0"
@@ -31,8 +26,3 @@ hex = "0.4.3"
 mockall = "0.11.2"
 pretty_env_logger = "0.4.0"
 sha2 = { version = "0.10.6", features = ["asm"] }
-
-[[bin]]
-name = "archive"
-path = "src/bin/archive.rs"
-required-features = ["bin"]
