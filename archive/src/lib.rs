@@ -28,13 +28,11 @@ pub use error::*;
 pub struct Options {
     /// The recursion strategy for archives.
     /// Files are always walked recursively; this setting solely controls archive expansion recursion.
+    #[builder(default)]
     recursion: Recursion,
 
-    /// Filters for file matching.
-    /// Currently unused.
-    _filter: Filter,
-
     /// The strategy for identifying expansion strategies for archives.
+    #[builder(default)]
     identification: Identification,
 }
 
@@ -142,13 +140,13 @@ pub struct Filter {
     /// Paths provided here are included.
     ///
     /// Note that exclusion takes precedence; see parent doc comments for details.
-    #[builder(setter(into))]
+    #[builder(setter(into), default)]
     include: HashSet<PathBuf>,
 
     /// Paths provided here are not included.
     ///
     /// Note that exclusion takes precedence; see parent doc comments for details.
-    #[builder(setter(into))]
+    #[builder(setter(into), default)]
     exclude: HashSet<PathBuf>,
 }
 

@@ -6,9 +6,55 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use archive::*;
 use archive::{ProjectRoot, Target};
+use log::debug;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
+
+#[track_caller]
+pub fn matches_content(
+    target: Target,
+    opts: Options,
+    archive: PathBuf,
+    expected: Vec<(&str, &[u8])>,
+) {
+    pretty_env_logger::init();
+
+    let result = expand::all(target, opts).unwrap();
+    debug!("extracted: {:?}", result.locations());
+
+    let destination = result
+        .locations()
+        .get_by_left(&Source::from(archive))
+        .unwrap()
+        .inner()
+        .clone();
+
+    assert_content(&destination, expected);
+}
+
+#[track_caller]
+pub fn matches_hashed_content(
+    target: Target,
+    opts: Options,
+    archive: PathBuf,
+    expected: Vec<(&str, &str)>,
+) {
+    pretty_env_logger::init();
+
+    let result = expand::all(target, opts).unwrap();
+    debug!("extracted: {:?}", result.locations());
+
+    let destination = result
+        .locations()
+        .get_by_left(&Source::from(archive))
+        .unwrap()
+        .inner()
+        .clone();
+
+    assert_hashed_content(&destination, expected);
+}
 
 #[track_caller]
 fn root() -> ProjectRoot {
