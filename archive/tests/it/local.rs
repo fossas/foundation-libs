@@ -1,4 +1,7 @@
+use std::collections::HashSet;
+
 use archive::*;
+use assert_matches::assert_matches;
 
 use crate::testdata;
 
@@ -65,4 +68,18 @@ fn cleanup_multiple() {
     result.cleanup().unwrap();
     result.cleanup().unwrap();
     drop(result);
+}
+
+#[test]
+fn filters_unsupported() {
+    pretty_env_logger::init();
+
+    let target = testdata::target("testdata/simplezip");
+    let filter = Filter::builder()
+        .include(HashSet::from([target.root().to_owned()]))
+        .build();
+
+    let opts = Options::builder().filter(filter).build();
+    let result = expand::all(target, opts);
+    assert_matches!(result, Err(Error::Invariant(Invariant::FiltersUnsupported)));
 }

@@ -8,6 +8,7 @@ edition = "2021"
 default = []
 
 [dependencies]
+assert_matches = "1.5.0"
 bimap = "0.6.2"
 compress-tools = "0.13.0"
 derivative = "2.2.0"

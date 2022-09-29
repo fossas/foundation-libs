@@ -34,6 +34,13 @@ pub struct Options {
     /// The strategy for identifying expansion strategies for archives.
     #[builder(default)]
     identification: Identification,
+
+    /// Filters for file walking.
+    ///
+    /// Currently unused but planned to be used in the future.
+    /// Accepting it as an option today means it can be used in the future without a breaking change.
+    #[builder(default)]
+    filter: Filter,
 }
 
 /// Recursion mode for expanding archives.
@@ -69,17 +76,14 @@ pub enum Recursion {
 }
 
 /// Identification mode for identifying archives to expand.
+///
+/// While this currently consists of one option, the idea is that there may be other options in the future;
+/// by using an enum new options may be added as non-breaking changes.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub enum Identification {
     /// Use the file extension to identify an archive expansion strategy.
     #[default]
     MatchExtension,
-
-    /// Attempt all possible expanders on each file walked. Output failed expansions as warnings.
-    ///
-    /// This is maximally correct, as it extracts any archive that this library is capable of extracting.
-    /// However this can incur a performance overhead.
-    Experiment,
 }
 
 /// Filters for file walking.

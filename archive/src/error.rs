@@ -7,6 +7,9 @@ use crate::{strategy, Target};
 /// Convenience macro to create an invariant error.
 #[macro_export]
 macro_rules! invariant {
+    ($kind:ident) => {
+        Err(Error::Invariant(Invariant::$kind))
+    };
     ($kind:ident, $arg:ident) => {
         Err(Error::Invariant(Invariant::$kind { $arg }))
     };
@@ -71,4 +74,9 @@ pub enum Invariant {
         /// The target provided to the archive expansion function.
         target: Target,
     },
+
+    /// The filter option was added for forwards compatibility, but filters were not immediately supported.
+    /// This error is used when non-default filters are provided to a version of the library that doesn't support filters.
+    #[error("filters are unsupported")]
+    FiltersUnsupported,
 }
