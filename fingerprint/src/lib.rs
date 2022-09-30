@@ -246,6 +246,20 @@ impl Combined {
     }
 }
 
+impl Display for Combined {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(comment_stripped) = &self.comment_stripped {
+            write!(
+                f,
+                "{}({}); {}({})",
+                RawSHA256, self.raw, CommentStrippedSHA256, comment_stripped,
+            )
+        } else {
+            write!(f, "{}({})", RawSHA256, self.raw())
+        }
+    }
+}
+
 /// Fingerprint the provided file with all fingerprint [`Kind`]s.
 pub fn fingerprint(path: &Path) -> Result<Combined, Error> {
     let mut file = File::open(path)?;

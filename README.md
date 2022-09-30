@@ -6,11 +6,11 @@
 
 # foundation-libs
 
-Foundational libraries for cross-language support, written in Rust.
+Foundational libraries and helper binaries for cross-language support, written in Rust.
 <sup>_[(TOC?)](https://github.blog/changelog/2021-04-13-table-of-contents-support-in-markdown-files/)_</sup>
 
 Include directly in Rust projects.
-For other languages, interact with FFI.
+For other languages, interact with FFI or executing binaries directly.
 
 (Walkthroughs to come)
 
