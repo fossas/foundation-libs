@@ -15,6 +15,13 @@ use strategy::Attempt;
 pub fn all(target: Target, options: Options) -> Result<Expansion, Error> {
     debug!("Expanding {target:?} with {options:?}");
 
+    // Since filters are unused today, don't let the user use anything other than the default filter set.
+    // This way nobody can accidentally rely on passing in some ignored filter that later silently breaks
+    // functionality without breaking the signature.
+    if options.filter != Filter::default() {
+        return invariant!(FiltersUnsupported);
+    }
+
     // Special case: don't try to scan a directory outside the project root.
     if !has_ancestor(target.project.inner(), &target.root) {
         debug!("{:?} is not a child of {:?}", target.root, target.project);

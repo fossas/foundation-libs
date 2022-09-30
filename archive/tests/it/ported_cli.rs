@@ -16,20 +16,6 @@ fn extract_simple_zip() {
     );
 }
 
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L30-L45
-#[test]
-fn extract_simple_zip_experiment_discovery() {
-    let target = testdata::target("testdata/simplezip");
-    testdata::matches_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
-        target.root().join("simple.zip"),
-        simple_content(),
-    );
-}
-
 /// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L47-L62
 #[test]
 fn extract_simple_tar() {
@@ -37,20 +23,6 @@ fn extract_simple_tar() {
     testdata::matches_content(
         target.clone(),
         Options::default(),
-        target.root().to_owned(),
-        simple_content(),
-    );
-}
-
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L47-L62
-#[test]
-fn extract_simple_tar_experiment_discovery() {
-    let target = testdata::target("testdata/simple.tar");
-    testdata::matches_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
         target.root().to_owned(),
         simple_content(),
     );
@@ -68,20 +40,6 @@ fn extract_simple_tar_gz() {
     );
 }
 
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L64-L79
-#[test]
-fn extract_simple_tar_gz_experiment_discovery() {
-    let target = testdata::target("testdata/simple.tar.gz");
-    testdata::matches_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
-        target.root().to_owned(),
-        simple_content(),
-    );
-}
-
 /// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L81-L96
 #[test]
 fn extract_simple_tar_xz() {
@@ -89,20 +47,6 @@ fn extract_simple_tar_xz() {
     testdata::matches_content(
         target.clone(),
         Options::default(),
-        target.root().to_owned(),
-        simple_content(),
-    );
-}
-
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L81-L96
-#[test]
-fn extract_simple_tar_xz_experiment_discovery() {
-    let target = testdata::target("testdata/simple.tar.xz");
-    testdata::matches_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
         target.root().to_owned(),
         simple_content(),
     );
@@ -120,20 +64,6 @@ fn extract_simple_tar_bz2() {
     );
 }
 
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L98-L113
-#[test]
-fn extract_simple_tar_bz2_experiment_discovery() {
-    let target = testdata::target("testdata/simple.tar.bz2");
-    testdata::matches_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
-        target.root().to_owned(),
-        simple_content(),
-    );
-}
-
 /// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L115-L121
 #[test]
 fn extract_el7_rpm() {
@@ -146,20 +76,6 @@ fn extract_el7_rpm() {
     );
 }
 
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L115-L121
-#[test]
-fn extract_el7_rpm_experiment_discovery() {
-    let target = testdata::target("testdata/curl-7.29.0-59.el7.x86_64.rpm");
-    testdata::matches_hashed_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
-        target.root().to_owned(),
-        el7_content(),
-    );
-}
-
 /// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L123-L129
 #[test]
 fn extract_fc35_rpm() {
@@ -167,20 +83,6 @@ fn extract_fc35_rpm() {
     testdata::matches_hashed_content(
         target.clone(),
         Options::default(),
-        target.root().to_owned(),
-        fc35_content(),
-    );
-}
-
-/// https://github.com/fossas/fossa-cli/blob/219bdc6f38d401df2bdb7991114c54083a75f56b/test/Discovery/ArchiveSpec.hs#L123-L129
-#[test]
-fn extract_fc35_rpm_experiment_discovery() {
-    let target = testdata::target("testdata/curl-7.78.0-3.fc35.x86_64.rpm");
-    testdata::matches_hashed_content(
-        target.clone(),
-        Options::builder()
-            .identification(Identification::Experiment)
-            .build(),
         target.root().to_owned(),
         fc35_content(),
     );

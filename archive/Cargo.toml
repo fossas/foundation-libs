@@ -8,6 +8,7 @@ edition = "2021"
 default = []
 
 [dependencies]
+assert_matches = "1.5.0"
 bimap = "0.6.2"
 compress-tools = "0.13.0"
 derivative = "2.2.0"
@@ -25,4 +26,4 @@ walkdir = "2.3.2"
 hex = "0.4.3"
 mockall = "0.11.2"
 pretty_env_logger = "0.4.0"
-sha2 = { version = "0.10.6", features = ["asm"] }
+sha2 = "0.10.6"

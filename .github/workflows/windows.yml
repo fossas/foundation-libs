@@ -42,4 +42,12 @@ jobs:
       # Check and test
       - uses: taiki-e/install-action@nextest
       - run: cargo check --release --all --bins --examples --tests
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
       - run: cargo nextest run
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
