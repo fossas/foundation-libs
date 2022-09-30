@@ -1,0 +1,29 @@
+name: macOS
+
+on: pull_request
+
+jobs:
+  build-and-test:
+    runs-on: macOS-latest
+
+    steps:
+      # Install system dependencies
+      - run: |
+          brew install pkgconfig libarchive
+          echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||') >> $GITHUB_ENV
+
+      # Set up repo and toolchain
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      # Need a lock file for caching
+      - run: cargo generate-lockfile
+      - uses: Swatinem/rust-cache@v1.3.0
+      
+      # Check and test
+      - uses: taiki-e/install-action@nextest
+      - run: cargo check --release --all --bins --examples --tests
+      - run: cargo nextest run

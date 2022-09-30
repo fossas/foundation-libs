@@ -1,0 +1,22 @@
+name: static
+
+on: pull_request
+
+jobs:
+  format-and-clippy:
+    runs-on: ubuntu-20.04
+    steps:
+      # Install system dependencies
+      - run: sudo apt-get update; sudo apt-get install libarchive-dev
+
+      # Set up repo and toolchain
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy, rustfmt
+      
+      # Check
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-features --all --tests -- -D clippy::all

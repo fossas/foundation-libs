@@ -6,3 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+derive-getters = "0.2.0"
+hex = "0.4.3"
+iter-read = "0.3.1"
+serde = { version = "1.0.140", features = ["derive"] }
+thiserror = "1.0.31"
+# TODO: Figure out how to get this building with ASM in Windows.
+sha2 = "0.10.2"
+
+[dev-dependencies]
+typed-builder = "0.10.0"
