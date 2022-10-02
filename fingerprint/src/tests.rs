@@ -94,6 +94,16 @@ fn fingerprints_text_file_stripping_cr() {
 }
 
 #[test]
+fn fingerprints_binary_file_appearing_as_text() {
+    // Sourced from `git@github.com:chromium/chromium.git` at `tools/origin_trials/eftest.key` on commit 49249345609d505c8bb8b0b5a42ff4b68b9e6d41.
+    let content = include_bytes!("../testdata/eftest.key");
+    let combined = fingerprint_stream(&mut Cursor::new(content)).expect("should not error");
+    let expected_fingerprint = make_fingerprint::<RawSHA256>(content);
+    assert_eq!(combined.raw, expected_fingerprint);
+    assert_eq!(combined.comment_stripped, None);
+}
+
+#[test]
 fn comment_stripped_does_not_fingerprint_binary_file() {
     let content = vec![1, 2, 3, 0, 1, 2, 3];
     let combined = fingerprint_stream(&mut Cursor::new(content)).expect("should not error");

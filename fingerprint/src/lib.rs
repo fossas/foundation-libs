@@ -40,15 +40,6 @@ pub enum Error {
     /// This error may be retried, but if it fails multiple times it's generally not recoverable.
     #[error("i/o error: {0}")]
     IO(#[from] io::Error),
-
-    /// An invariant was not followed. These errors are not recoverable and indicate a program bug.
-    #[error("invariant: {0}")]
-    Invariant(InvariantError),
-
-    /// Unimplemented functionality. This is temporary while this library is under development.
-    /// Testing `todo` panics with `join` is annoying.
-    #[error("unimplemented: {0}")]
-    Unimplemented(String),
 }
 
 /// Kinds of invariants that may be reported in [`Error::Invariant`].

@@ -26,13 +26,23 @@ pub fn comment_stripped<R: Read>(
 ) -> Result<Option<Fingerprint<CommentStrippedSHA256>>, Error> {
     // Read the start of the stream, and decide whether to treat the rest of the stream as binary based on that.
     let BinaryCheck { read, is_binary } = content_is_binary(stream)?;
+    if is_binary {
+        return Ok(None);
+    }
 
     // Chain the part of the stream already read to evaluate binary along with the rest of the stream.
     let mut stream = Cursor::new(read).chain(stream);
-    if is_binary {
-        Ok(None)
-    } else {
-        Some(hash_text_stripped(&mut stream)).transpose()
+    match hash_text_stripped(&mut stream) {
+        Ok(fp) => Ok(Some(fp)),
+        Err(err) => {
+            // The `io::Error` type is opaque 😭
+            // Handle the case of attempting to comment strip a binary file.
+            if err.to_string().to_lowercase().contains("utf-8") {
+                Ok(None)
+            } else {
+                Err(err)
+            }
+        }
     }
 }
 
