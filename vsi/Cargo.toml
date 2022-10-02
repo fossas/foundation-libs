@@ -1,6 +1,6 @@
 [package]
 name = "vsi"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "The canonical client binary for running VSI scans"
 
@@ -13,7 +13,6 @@ cancel = "0.1.0"
 clap = { version = "4.0.4", features = ["derive", "cargo", "env"] }
 defer-lite = "1.0.0"
 derive_more = "0.99.17"
-fingerprint = { version = "0.1.0", path = "../fingerprint" }
 getset = "0.1.2"
 lazy_static = "1.4.0"
 log = "0.4.17"
@@ -29,3 +28,9 @@ strum = { version = "0.24.1", features = ["derive"] }
 tokio = { version = "1.21.2", features = ["full"] }
 typed-builder = "0.10.0"
 walkdir = "2.3.2"
+
+[target.'cfg(windows)'.dependencies]
+fingerprint = { version = "*", path = "../fingerprint" }
+
+[target.'cfg(unix)'.dependencies]
+fingerprint = { version = "*", path = "../fingerprint", features = ["asm"] }

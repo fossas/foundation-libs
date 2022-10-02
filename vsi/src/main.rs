@@ -5,7 +5,7 @@
 #![warn(rust_2018_idioms)]
 #![deny(clippy::unwrap_used)]
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
 use log::{debug, info, Level};
@@ -179,27 +179,37 @@ async fn run_full_scan(
     scan: config::Scan,
     display: config::Display,
 ) -> Result<()> {
+    let start = Instant::now();
+
     let id = client.create_scan().await.context("create scan")?;
     info!("created scan: {id}");
 
+    info!("scanning artifacts");
     let opts = scan::Options::builder().root(scan.dir()).build();
-    info!("scanning artifacts with options: {opts:?}");
-    scan::artifacts(&client, &id, opts)
+    let artifact_count = scan::artifacts(&client, &id, opts)
         .await
         .context("scan artifacts")?;
-
-    info!("complete scan");
     client
         .complete_scan(&id)
         .await
         .context("mark scan complete")?;
+
+    info!(
+        "completed scan of {artifact_count} artifacts in {:?}",
+        start.elapsed()
+    );
+    let forensics = Instant::now();
 
     info!("waiting for forensics");
     wait_forensics(&client, &id)
         .await
         .context("wait for forensics")?;
 
-    info!("forensics complete");
+    info!(
+        "forensics complete in {:?} (total: {:?})",
+        forensics.elapsed(),
+        start.elapsed()
+    );
     match display.export() {
         config::Export::ScanID => println!("{{ scan_id: {id} }}"),
         config::Export::Locators => {

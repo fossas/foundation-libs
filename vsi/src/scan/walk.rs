@@ -38,6 +38,7 @@ impl Context {
     }
 
     /// Walks the file system producing `Artifact`s. Outputs them to the output channel.
+    /// Returns the count of artifcts produced.
     ///
     /// Outputs are generated in parallel and then are interleaved to the channel,
     /// meaning that it is possible to have an error returned followed by data being written to the channel.
@@ -49,7 +50,7 @@ impl Context {
     /// This includes cancellation: if the cancel token is cancelled, this function returns a cancellation error.
     /// Closes the output channel on return.
     // This function primarily exists in order to wrap the spawn join back into a result.
-    pub async fn walk_local_fs(&self, output: Sender<Artifact>, opts: Options) -> Result<()> {
+    pub async fn walk_local_fs(&self, output: Sender<Artifact>, opts: Options) -> Result<usize> {
         debug!("walking fs with options: {opts:?}");
         defer! { debug!("exiting fs walker"); }
 
@@ -61,7 +62,8 @@ impl Context {
 }
 
 /// The worker for `fs`, since directory walking and fingerprinting are currently synchronous operations.
-fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<()> {
+fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<usize> {
+    let mut produced = 0;
     use stable_eyre::eyre::Context;
     WalkDir::new(&opts.root)
         .follow_links(false)
@@ -72,6 +74,7 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
         // Only attempt to process files for fingerprints.
         // Pass along errors too, so that the error can be reported.
         .filter(is_file_or_err)
+        .inspect(|_| produced += 1)
         // Rayon magic: turn this iterator into a parallel iterator, then generate each artifact in parallel.
         .par_bridge()
         .try_for_each(|de| -> Result<()> {
@@ -88,8 +91,10 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
             let artifact = Artifact(path, combined);
             debug!("generated artifact: {artifact}");
             out.blocking_send(artifact).context("send entry")?;
+
             Ok(())
-        })
+        })?;
+    Ok(produced)
 }
 
 fn matches_filters(_: &DirEntry, _: &Options) -> bool {

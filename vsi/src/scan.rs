@@ -18,7 +18,10 @@ use defer_lite::defer;
 use derive_more::{Display, From};
 use log::debug;
 use serde::{Deserialize, Serialize};
-use stable_eyre::{eyre::Context, Result};
+use stable_eyre::{
+    eyre::{ensure, Context},
+    Result,
+};
 use tokio::{
     sync::mpsc::{channel, Receiver},
     try_join,
@@ -82,11 +85,12 @@ impl<T: Client + Sync> Sink for T {
 }
 
 /// Walk the file system, generating and uploading scan artifacts in parallel.
+/// Returns the number of artifacts uploaded.
 ///
 /// # Resource leaking
 ///
 /// Dropping this future early can result in leaked threads.
-pub async fn artifacts(client: &impl Sink, id: &Id, opts: Options) -> Result<()> {
+pub async fn artifacts(client: &impl Sink, id: &Id, opts: Options) -> Result<usize> {
     debug!("scanning artifacts for scan {id} with options: {opts:?}");
     defer! { debug!("exited scanning artifacts"); }
 
@@ -104,16 +108,24 @@ pub async fn artifacts(client: &impl Sink, id: &Id, opts: Options) -> Result<()>
     // Either way, cancel the token and return the result. This ensures that (assuming it behaves correctly)
     // the walker doesn't keep running for an unbounded amount of time after this function returns.
     // Due to parallel invocation it may keep running for a non-zero amount of time, but that _should_ be minimal.
-    try_join!(uploader, walker).map(|_| ())
+    try_join!(uploader, walker).and_then(|(uploaded, produced)| {
+        ensure!(
+            uploaded == produced,
+            "mismatch between uploaded ({uploaded}) and produced ({produced})"
+        );
+        Ok(uploaded)
+    })
 }
 
 /// Buffers incoming `Artifact`s in the input channel. Once enough have been buffered,
 /// uploads them to the VSI Forensics Service through the provided sink implementation.
+/// Returns the number of artifacts uploaded.
 ///
 /// Returns with an error if an error is encountered during the upload.
-async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> Result<()> {
+async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> Result<usize> {
     debug!("running uploader");
     defer! { debug!("exited uploader"); }
+    let mut uploaded = 0;
 
     // Buffer artifacts and upload them.
     // The channel also contains its own buffering, so needless backpressure should be minimal;
@@ -122,6 +134,7 @@ async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> R
     while let Some(artifact) = input.recv().await {
         debug!("buffering artifact: {artifact}");
         buf.push(artifact);
+        uploaded += 1;
 
         debug!("buffered {} / {ARTIFACT_BUFFER_LIMIT} artifacts", buf.len());
         if buf.len() == ARTIFACT_BUFFER_LIMIT {
@@ -140,5 +153,5 @@ async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> R
             .context("upload final buffer")?;
     }
 
-    Ok(())
+    Ok(uploaded)
 }
