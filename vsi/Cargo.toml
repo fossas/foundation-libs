@@ -14,6 +14,7 @@ clap = { version = "4.0.4", features = ["derive", "cargo", "env"] }
 defer-lite = "1.0.0"
 derive_more = "0.99.17"
 fingerprint = { version = "0.1.0", path = "../fingerprint" }
+getset = "0.1.2"
 lazy_static = "1.4.0"
 log = "0.4.17"
 mockall = "0.11.2"
@@ -24,6 +25,7 @@ serde = { version = "1.0.145", features = ["derive"] }
 serde_json = "1.0.85"
 stable-eyre = "0.2.2"
 stderrlog = "0.5.3"
+strum = { version = "0.24.1", features = ["derive"] }
 tokio = { version = "1.21.2", features = ["full"] }
 typed-builder = "0.10.0"
 walkdir = "2.3.2"

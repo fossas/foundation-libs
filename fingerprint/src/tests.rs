@@ -8,13 +8,10 @@ use crate::serialize::kind::{kinds_evaluated, would_evaluate_new_kinds, Serializ
 
 use super::*;
 
-fn hash(content: &[u8]) -> [u8; 32] {
+fn hash(content: &[u8]) -> Vec<u8> {
     let mut hasher = Sha256::new();
     hasher.update(content);
-    let result = &hasher.finalize()[..];
-    result
-        .try_into()
-        .expect("invariant: hashes must be 32 bytes")
+    hasher.finalize().as_slice().to_vec()
 }
 
 fn make_fingerprint<K: Kind>(content: &[u8]) -> Fingerprint<K> {

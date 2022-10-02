@@ -7,7 +7,7 @@ use derive_more::Constructor;
 use log::info;
 use stable_eyre::Result;
 
-use crate::{api::Locator, scan};
+use crate::{api::Locator, forensics, scan};
 
 /// Logs output and drops it. Always results in the same set of locators being discovered.
 /// Meant for basic sanity testing.
@@ -42,9 +42,9 @@ impl super::Client for Devnull {
     }
 
     /// Waits for the forensics process to complete or error.
-    async fn wait_forensics(&self, id: &scan::Id) -> Result<()> {
-        info!("[dryrun] wait for forensics for scan {id}");
-        Ok(())
+    async fn forensics_status(&self, id: &scan::Id) -> Result<forensics::Status> {
+        info!("[dryrun] get forensics for scan {id}");
+        Ok(forensics::Status::Finished)
     }
 
     /// Downloads the forensics results.

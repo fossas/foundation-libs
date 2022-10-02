@@ -19,7 +19,7 @@ mod fossa;
 pub use devnull::*;
 pub use fossa::*;
 
-use crate::scan;
+use crate::{forensics, scan};
 
 /// Refers to a locator result for a scan.
 ///
@@ -41,8 +41,8 @@ pub trait Client {
     /// Complete a scan. This signals to the VSI Forensics Service that no new artifacts will be uploaded after this point.
     async fn complete_scan(&self, id: &scan::Id) -> Result<()>;
 
-    /// Waits for the forensics process to complete or error.
-    async fn wait_forensics(&self, id: &scan::Id) -> Result<()>;
+    /// Get the current forensics status for a scan.
+    async fn forensics_status(&self, id: &scan::Id) -> Result<forensics::Status>;
 
     /// Downloads the forensics results.
     ///

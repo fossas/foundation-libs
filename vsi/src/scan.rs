@@ -35,6 +35,7 @@ const ARTIFACT_BUFFER_LIMIT: usize = 1000;
 #[derive(Clone, Eq, PartialEq, Debug, TypedBuilder)]
 pub struct Options {
     /// The directory to walk.
+    #[builder(setter(into))]
     root: PathBuf,
 }
 
@@ -51,6 +52,18 @@ pub struct Artifact(PathBuf, fingerprint::Combined);
 impl Display for Artifact {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Artifact({:?}, {})", self.0, self.1)
+    }
+}
+
+impl Artifact {
+    /// Explode the artifact into its constituent tuple.
+    pub fn explode(self) -> (PathBuf, fingerprint::Combined) {
+        (self.0, self.1)
+    }
+
+    /// Explode, but with a string instead of a path.
+    pub fn explode_string(self) -> (String, fingerprint::Combined) {
+        (self.0.to_string_lossy().to_string(), self.1)
     }
 }
 
@@ -107,7 +120,7 @@ async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> R
     // backpressure should only occur when uploading is actually slower than fingerprinting (which is correct).
     let mut buf = Vec::with_capacity(ARTIFACT_BUFFER_LIMIT);
     while let Some(artifact) = input.recv().await {
-        debug!("buffering artifact: {artifact:?}");
+        debug!("buffering artifact: {artifact}");
         buf.push(artifact);
 
         debug!("buffered {} / {ARTIFACT_BUFFER_LIMIT} artifacts", buf.len());

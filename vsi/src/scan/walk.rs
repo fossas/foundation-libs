@@ -86,7 +86,7 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
 
             // Generate and send the artifact.
             let artifact = Artifact(path, combined);
-            debug!("generated artifact: {artifact:?}");
+            debug!("generated artifact: {artifact}");
             out.blocking_send(artifact).context("send entry")?;
             Ok(())
         })
