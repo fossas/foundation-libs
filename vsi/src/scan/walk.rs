@@ -1,9 +1,13 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use cancel::Token;
 use defer_lite::defer;
 use fingerprint::fingerprint;
-use log::debug;
+use log::{debug, info};
+use num_format::{Locale, ToFormattedString};
 use rayon::prelude::*;
 use stable_eyre::{
     eyre::{bail, eyre},
@@ -11,6 +15,8 @@ use stable_eyre::{
 };
 use tokio::{sync::mpsc::Sender, task};
 use walkdir::{DirEntry, WalkDir};
+
+const REPORT_TIMEOUT: Duration = Duration::from_secs(1);
 
 use super::{Artifact, Options};
 
@@ -63,7 +69,12 @@ impl Context {
 
 /// The worker for `fs`, since directory walking and fingerprinting are currently synchronous operations.
 fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<usize> {
+    debug!("enter fs worker");
+    defer! { debug!("exiting fs worker"); }
+
     let mut produced = 0;
+    let mut last_report = Instant::now();
+
     use stable_eyre::eyre::Context;
     WalkDir::new(&opts.root)
         .follow_links(false)
@@ -74,7 +85,19 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
         // Only attempt to process files for fingerprints.
         // Pass along errors too, so that the error can be reported.
         .filter(is_file_or_err)
-        .inspect(|_| produced += 1)
+        // Collect and report in the iterator before it becomes parallel; iteration here is serial.
+        // Iterators are lazy so this still benefits from parallel operations.
+        .inspect(|_| {
+            produced += 1;
+            let now = Instant::now();
+            if now.duration_since(last_report) >= REPORT_TIMEOUT {
+                info!(
+                    "discovered {} fingerprints...",
+                    produced.to_formatted_string(&Locale::en)
+                );
+                last_report = now;
+            }
+        })
         // Rayon magic: turn this iterator into a parallel iterator, then generate each artifact in parallel.
         .par_bridge()
         .try_for_each(|de| -> Result<()> {
@@ -94,6 +117,11 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
 
             Ok(())
         })?;
+
+    info!(
+        "discovered {} fingerprints total",
+        produced.to_formatted_string(&Locale::en)
+    );
     Ok(produced)
 }
 

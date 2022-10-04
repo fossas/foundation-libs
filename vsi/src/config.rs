@@ -76,15 +76,16 @@ pub struct Display {
 }
 
 /// Configures options related to the scan.
-#[derive(Parser, Debug, Getters)]
-#[getset(get = "pub")]
+#[derive(Parser, Debug, Getters, CopyGetters)]
 pub struct Scan {
     /// Whether to enable debug logging.
     #[clap(long, short)]
+    #[getset(get_copy = "pub")]
     debug: bool,
 
     /// The directory to fingerprint.
     #[clap()]
+    #[getset(get = "pub")]
     dir: PathBuf,
 
     /// Paths provided here are included.
@@ -92,6 +93,7 @@ pub struct Scan {
     /// Exclusion takes precedence: if a path is both excluded and included, it is excluded.
     /// This rule holds recursively; if a parent is excluded, included children are still excluded.
     #[clap(long)]
+    #[getset(get = "pub")]
     only_paths: Vec<PathBuf>,
 
     /// Paths provided here are not included.
@@ -99,6 +101,7 @@ pub struct Scan {
     /// Exclusion takes precedence: if a path is both excluded and included, it is excluded.
     /// This rule holds recursively; if a parent is excluded, included children are still excluded.
     #[clap(long)]
+    #[getset(get = "pub")]
     exclude_paths: Vec<PathBuf>,
 }
 

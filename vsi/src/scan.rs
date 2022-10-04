@@ -90,19 +90,19 @@ impl<T: Client + Sync> Sink for T {
 /// # Resource leaking
 ///
 /// Dropping this future early can result in leaked threads.
-pub async fn artifacts(client: &impl Sink, id: &Id, opts: Options) -> Result<usize> {
-    debug!("scanning artifacts for scan {id} with options: {opts:?}");
+pub async fn artifacts<S: Sink>(client: &S, id: &Id, opts: Options) -> Result<usize> {
+    debug!("scanning artifacts for scan {} at {:?}", id, opts.root);
     defer! { debug!("exited scanning artifacts"); }
 
     // Allow the channel to buffer up to the limit while an upload runs.
-    let (tx, rx) = channel(ARTIFACT_BUFFER_LIMIT);
-    let uploader = upload(client, id, rx);
+    let (artifact_tx, artifact_rx) = channel(ARTIFACT_BUFFER_LIMIT);
+    let uploader = upload(client, id, artifact_rx);
 
     // Walking and fingerprinting is a synchronous- but streaming- operation.
     // Dropping the future returned by `task::spawn_blocking` doesn't kill the thread (it can't possibly do so).
     // This token allows for cooperative cancellation of the thread.
     let ctx = walk::Context::new();
-    let walker = ctx.walk_local_fs(tx, opts);
+    let walker = ctx.walk_local_fs(artifact_tx, opts);
 
     // Wait for both uploader and walker to complete, or one to error.
     // Either way, cancel the token and return the result. This ensures that (assuming it behaves correctly)
@@ -122,7 +122,7 @@ pub async fn artifacts(client: &impl Sink, id: &Id, opts: Options) -> Result<usi
 /// Returns the number of artifacts uploaded.
 ///
 /// Returns with an error if an error is encountered during the upload.
-async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> Result<usize> {
+async fn upload<S: Sink>(client: &S, id: &Id, mut rx: Receiver<Artifact>) -> Result<usize> {
     debug!("running uploader");
     defer! { debug!("exited uploader"); }
     let mut uploaded = 0;
@@ -131,7 +131,7 @@ async fn upload(client: &impl Sink, id: &Id, mut input: Receiver<Artifact>) -> R
     // The channel also contains its own buffering, so needless backpressure should be minimal;
     // backpressure should only occur when uploading is actually slower than fingerprinting (which is correct).
     let mut buf = Vec::with_capacity(ARTIFACT_BUFFER_LIMIT);
-    while let Some(artifact) = input.recv().await {
+    while let Some(artifact) = rx.recv().await {
         debug!("buffering artifact: {artifact}");
         buf.push(artifact);
         uploaded += 1;

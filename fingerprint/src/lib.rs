@@ -12,6 +12,11 @@
 //!
 //! For more information, refer to the documentation for the types below.
 
+#![deny(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(rust_2018_idioms)]
+#![deny(clippy::unwrap_used)]
+
 use std::{
     fmt::Display,
     fs::File,
@@ -20,8 +25,7 @@ use std::{
     path::Path,
 };
 
-use derive_getters::Getters;
-
+use getset::Getters;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -40,13 +44,6 @@ pub enum Error {
     /// This error may be retried, but if it fails multiple times it's generally not recoverable.
     #[error("i/o error: {0}")]
     IO(#[from] io::Error),
-}
-
-/// Kinds of invariants that may be reported in [`Error::Invariant`].
-#[derive(Error, Debug, Eq, PartialEq)]
-pub enum InvariantError {
-    #[error("the resulting hash digest was not 32 bytes")]
-    HashDigestSize,
 }
 
 /// Fingerprint kinds MUST maintain exact implementation compatibility; once the algorithm for a given kind
@@ -139,6 +136,7 @@ impl Blob {
         Ok(Blob(buf))
     }
 
+    /// Reference the bytes inside the blob.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -175,8 +173,11 @@ pub trait Hashable {
 /// If two fingerprints are the same, the contents of the files used to create the fingerprints are the same.
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Getters)]
 #[cfg_attr(test, derive(TypedBuilder))]
+#[getset(get = "pub")]
 pub struct Fingerprint<K: Kind> {
+    #[getset(skip)]
     kind: PhantomData<K>,
+    /// The content of the blob.
     content: Blob,
 }
 
@@ -254,11 +255,14 @@ where
 /// in the resulting data structure, because that kind of fingerprint requires UTF8 encoded text content to run.
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Getters, Serialize, Deserialize)]
 #[cfg_attr(test, derive(TypedBuilder))]
+#[getset(get = "pub")]
 pub struct Combined {
+    /// This fingerprint is derived regardless of the kind of file.
     // Important: if this struct is changed, update `serialize::kind::kinds_evaluated` to reflect the change.
     // `kinds_evaluated` may be replaced by a macro in the future.
     #[serde(rename = "sha_256")]
     raw: Fingerprint<RawSHA256>,
+    /// The fingerprint derived when the file is a text file, and any C-style comments have been removed.
     #[serde(rename = "comment_stripped:sha_256")]
     comment_stripped: Option<Fingerprint<CommentStrippedSHA256>>,
 }

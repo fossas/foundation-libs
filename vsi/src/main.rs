@@ -145,9 +145,10 @@ async fn main_partial(CmdPartial { scan, api, scan_id }: CmdPartial) -> Result<(
 
     let client = Fossa::new(&api, &scan).context("create client")?;
     let opts = scan::Options::builder().root(scan.dir()).build();
+    let id = scan::Id::from(scan_id);
 
-    debug!("scanning partial artifacts into scan {scan_id} with options: {opts:?}");
-    scan::artifacts(&client, &scan::Id::from(scan_id), opts)
+    debug!("scanning partial artifacts into scan {id} with options: {opts:?}");
+    scan::artifacts(&client, &id, opts)
         .await
         .context("scan artifacts")?;
 
@@ -198,18 +199,12 @@ async fn run_full_scan(
         "completed scan of {artifact_count} artifacts in {:?}",
         start.elapsed()
     );
-    let forensics = Instant::now();
 
     info!("waiting for forensics");
     wait_forensics(&client, &id)
         .await
         .context("wait for forensics")?;
 
-    info!(
-        "forensics complete in {:?} (total: {:?})",
-        forensics.elapsed(),
-        start.elapsed()
-    );
     match display.export() {
         config::Export::ScanID => println!("{{ scan_id: {id} }}"),
         config::Export::Locators => {
@@ -229,6 +224,7 @@ async fn run_full_scan(
 
 /// Waits for forensics to complete or error.
 async fn wait_forensics(client: &impl Client, id: &scan::Id) -> Result<()> {
+    let start = Instant::now();
     let delay = Duration::from_secs(1);
     let mut last_status: Option<forensics::Status> = None;
     loop {
@@ -249,7 +245,7 @@ async fn wait_forensics(client: &impl Client, id: &scan::Id) -> Result<()> {
                 info!("forensic analysis is enqueued, waiting to start...")
             }
             forensics::Status::Finished => {
-                info!("forensic analysis complete");
+                info!("forensics complete in {:?}", start.elapsed());
                 return Ok(());
             }
             forensics::Status::Failed => {
@@ -266,13 +262,14 @@ async fn wait_forensics(client: &impl Client, id: &scan::Id) -> Result<()> {
 
 /// Configures the global logger for the application based on self.
 fn init_logging(scan: &config::Scan) -> Result<()> {
-    Ok(stderrlog::new()
+    stderrlog::new()
         .module(module_path!())
-        .color(ColorChoice::Auto)
-        .verbosity(if *scan.debug() {
+        .color(ColorChoice::Never)
+        .verbosity(if scan.debug() {
             Level::Debug
         } else {
             Level::Info
         })
-        .init()?)
+        .init()?;
+    Ok(())
 }
