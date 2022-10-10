@@ -11,6 +11,9 @@ use crate::{strategy::Attempt, *};
 /// If it is an archive, it is expanded, and then its contents are walked according to the provided options.
 ///
 /// Any walked path is joined with `project` and then compared against the filters for inclusion.
+///
+/// It is recommended to use the iterator walker if possible instead, as it keeps disk space more under control
+/// by removing temporary directories after they are no longer needed instead of unarchiving all contents at once.
 pub fn all(target: Target, options: Options) -> Result<Expansion, Error> {
     debug!("Expanding {target:?} with {options:?}");
 
@@ -19,12 +22,6 @@ pub fn all(target: Target, options: Options) -> Result<Expansion, Error> {
     // functionality without breaking the signature.
     if options.filter != Filter::default() {
         return invariant!(FiltersUnsupported);
-    }
-
-    // Special case: don't try to scan a directory outside the project root.
-    if !has_ancestor(target.project.inner(), &target.root) {
-        debug!("{:?} is not a child of {:?}", target.root, target.project);
-        return invariant!(TargetProjectSubdir, target);
     }
 
     // Special case: if root is a link, error.
@@ -111,10 +108,6 @@ impl Expansion {
     fn record_many(&mut self, attempts: impl Iterator<Item = Attempt>) {
         attempts.into_iter().for_each(|a| self.record(a))
     }
-}
-
-fn has_ancestor(ancestor: &Path, child: &Path) -> bool {
-    child.ancestors().any(|parent| parent == ancestor)
 }
 
 fn noop_filter(_: &Path) -> bool {

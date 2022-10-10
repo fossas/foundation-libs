@@ -54,13 +54,6 @@ pub enum Error {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Invariant {
-    /// The target is not a subdirectory of the project root.
-    #[error("target {:?} is not a subdirectory of project root {:?}", target.root, target.project)]
-    TargetProjectSubdir {
-        /// The target provided to the archive expansion function.
-        target: Target,
-    },
-
     /// The target is not walkable. It is either not a supported archive or not a directory.
     #[error("{:?} is not walkable; it must be an archive or a directory", target.root)]
     Walkable {

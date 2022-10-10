@@ -6,8 +6,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use archive::Target;
 use archive::*;
-use archive::{ProjectRoot, Target};
 use log::debug;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
@@ -56,16 +56,10 @@ pub fn matches_hashed_content(
     assert_hashed_content(&destination, expected);
 }
 
-#[track_caller]
-fn root() -> ProjectRoot {
-    PathBuf::from("testdata").canonicalize().unwrap().into()
-}
-
 /// Get the target for a given path inside `testdata`.
 #[track_caller]
 pub fn target(path: impl Into<PathBuf>) -> Target {
     Target::builder()
-        .project(root())
         .root(path.into().canonicalize().unwrap())
         .build()
 }

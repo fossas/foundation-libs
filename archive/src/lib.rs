@@ -248,23 +248,11 @@ impl Expansion {
 /// The target of an expansion operation.
 #[derive(Clone, Debug, TypedBuilder, Getters)]
 pub struct Target {
-    /// The root of the project within which `target` is being searched for archives to expand.
-    /// Any walked path is joined with `project_root` and compared against the filters for inclusion.
-    #[builder(setter(into))]
-    #[getset(get = "pub")]
-    project: ProjectRoot,
-
     /// The directory within `project_root` that is being expanded.
     #[builder(setter(into))]
     #[getset(get = "pub")]
     root: PathBuf,
 }
-
-/// The project root directory is a special instance of a file path with special meaning.
-/// It represents the root of the project in which archives in some subdir are being expanded.
-/// Paths are generated with the project root in mind and compared against the root for filtering.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
-pub struct ProjectRoot(PathBuf);
 
 /// The source at which an archive was discovered in the root during an expansion operation.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, From)]
@@ -278,7 +266,6 @@ pub struct Destination(PathBuf);
     name          internal;
     [Source]      [PathBuf];
     [Destination] [PathBuf];
-    [ProjectRoot] [PathBuf];
 )]
 impl name {
     /// Create a new instance of self.
