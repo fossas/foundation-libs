@@ -1,5 +1,7 @@
 //! Archive expansion functionality.
 
-mod all;
+pub mod all;
+pub mod walk;
 
-pub use all::*;
+pub use all::all;
+pub use walk::walk;

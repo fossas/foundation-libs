@@ -87,7 +87,96 @@ pub fn all(target: Target, options: Options) -> Result<Expansion, Error> {
     Ok(expansion)
 }
 
+/// The results of synchronously expanding all archives in a given root.
+///
+/// # Temporary directory deletion
+///
+/// Directories, represented by `Destination` entries in `locations`,
+/// are deleted automatically when `Expansion` goes out of scope.
+///
+/// It is the user's responsibility to ensure that no further interaction is attempted after dropping `Expansion`.
+///
+/// - To avoid automatically deleting the temporary directories, use `persist`.
+/// - Automatic cleanup doesn't allow the user to view potential errors; to view cleanup errors use `cleanup` directly.
+///
+/// # Resource leaking
+///
+/// Various platform-specific conditions may cause `Expansion` to fail to delete the underlying directory.
+/// It is also possible to prevent cleanup via segfault, SIGINT, `std::process::exit` or similar.
+#[derive(Debug, Getters, Default)]
+pub struct Expansion {
+    /// Locations mapping a path discovered in the root (the [`Source`])
+    /// to the location on the file system to which it was expanded (the [`Destination`]).
+    #[getset(get = "pub")]
+    locations: BiHashMap<Source, Destination>,
+
+    /// Warnings encountered during the expansion process.
+    ///
+    /// Any non-fatal error encountered is treated as a warning and attached to the file
+    /// upon which the operation was attempted.
+    #[getset(get = "pub")]
+    warnings: HashMap<Source, Vec<Error>>,
+}
+
+impl Drop for Expansion {
+    fn drop(&mut self) {
+        let _ = self.cleanup();
+    }
+}
+
 impl Expansion {
+    /// Persist the temporary directories to disk, returning the contents of `Self` as a tuple.
+    ///
+    /// This consumes the `Expansion` without deleting temporary directories on the file system,
+    /// meaning that they are no longer automatically deleted.
+    pub fn persist(self) -> (BiHashMap<Source, Destination>, HashMap<Source, Vec<Error>>) {
+        let mut this = mem::ManuallyDrop::new(self);
+        (
+            mem::take(&mut this.locations),
+            mem::take(&mut this.warnings),
+        )
+    }
+
+    /// Delete all destinations and clear the `locations` map.
+    ///
+    /// If no errors are encountered the result is ok;
+    /// if any errors are encountered they are collected into the returned error list.
+    ///
+    /// This function is equivalent to causing `Expansion` to be dropped by letting it go out of scope;
+    /// the intention with this function is to enable checking for cleanup errors when desired.
+    ///
+    /// It is supported to call `cleanup` multiple times; subsequent operations are a no-op,
+    /// regardless whether the first call to `cleanup` was fully successful.
+    pub fn cleanup(&mut self) -> Result<(), Vec<Error>> {
+        // Special case for when dropped after manually running `cleanup`.
+        if self.locations.is_empty() {
+            return Ok(());
+        }
+
+        let errors = self
+            .locations
+            .right_values()
+            .map(|d| d.inner().to_owned())
+            .fold(Vec::new(), |mut acc, destination| {
+                if let Err(error) = fs::remove_dir_all(&destination) {
+                    acc.push(Error::Cleanup { destination, error });
+                }
+                acc
+            });
+
+        self.locations = BiHashMap::default();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// List all destinations.
+    pub fn destinations(&self) -> HashSet<Destination> {
+        self.locations.right_values().cloned().collect()
+    }
+
     fn record(&mut self, attempt: Attempt) {
         match attempt.result {
             Ok(destination) => {

@@ -16,3 +16,4 @@
 mod local;
 mod ported_cli;
 mod testdata;
+mod walk;

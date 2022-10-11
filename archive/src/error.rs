@@ -1,4 +1,7 @@
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{PathBuf, StripPrefixError},
+};
 
 use thiserror::Error;
 
@@ -48,6 +51,18 @@ pub enum Error {
     /// Reached the recursion limit.
     #[error("recursion limit")]
     RecursionLimit,
+
+    /// Attempted to render a path, but it could not be made relative.
+    #[error("render {child:?} relative to {parent:?}")]
+    RenderPathRelative {
+        /// The parent directory.
+        parent: PathBuf,
+        /// The child item, which should have been inside the parent (so it could render relative).
+        child: PathBuf,
+        /// The error encountered attempting to make the path relative.
+        #[source]
+        err: StripPrefixError,
+    },
 }
 
 /// Invariants expected by this library.

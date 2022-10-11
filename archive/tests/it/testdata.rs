@@ -6,8 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use archive::Target;
-use archive::*;
+use archive::{Target, *};
 use log::debug;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
