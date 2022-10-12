@@ -57,10 +57,8 @@ fn entries_keep_dirs_alive() {
         }
     }
 
-    // Let some time pass: temp directories are cleaned up on drop, so this process may not be instant.
-    // Wait a bit to ensure that if the drop cleanup was going to run, it has had a chance to do so.
-    sleep(Duration::from_millis(100));
-
+    // Temp directories are cleaned up on drop, and drop runs in the foreground: https://abramov.io/rust-dropping-things-in-another-thread
+    // Now that the original `WalkTarget`s have been dropped, ensure that their entries kept them alive.
     let mut dirs = Vec::with_capacity(temp_paths.len());
     assert!(!temp_paths.is_empty());
     for entry in temp_paths {
@@ -71,9 +69,8 @@ fn entries_keep_dirs_alive() {
         dirs.push(entry.concrete().to_owned());
     }
 
-    // Let some time pass again: all entries should be dropped at this point.
+    // All entries should be dropped at this point.
     // Ensure that while we kept the containing dir alive, we didn't turn it into a zombie somehow.
-    sleep(Duration::from_millis(100));
     for dir in dirs {
         assert!(!dir.exists(), "entry {dir:?} should now be cleaned up");
     }
