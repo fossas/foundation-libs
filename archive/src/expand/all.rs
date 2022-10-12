@@ -153,18 +153,23 @@ impl Expansion {
             return Ok(());
         }
 
-        let errors = self
-            .locations
-            .right_values()
-            .map(|d| d.inner().to_owned())
-            .fold(Vec::new(), |mut acc, destination| {
+        let errors: Vec<_> = mem::take(&mut self.locations)
+            .into_iter()
+            .filter_map(|(_, dest)| {
+                let destination = dest.into_inner();
                 if let Err(error) = fs::remove_dir_all(&destination) {
-                    acc.push(Error::Cleanup { destination, error });
+                    Some(Error::Cleanup { destination, error })
+                } else {
+                    None
                 }
-                acc
-            });
+            })
+            .collect();
 
-        self.locations = BiHashMap::default();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
         if errors.is_empty() {
             Ok(())
         } else {
