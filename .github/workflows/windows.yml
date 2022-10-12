@@ -51,3 +51,6 @@ jobs:
           RUSTFLAGS: -C target-feature=+crt-static
           VCPKGRS_DYNAMIC: 0
           VCPKG_DEFAULT_TRIPLET: x64-windows-static
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+          FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
+          ENABLE_NETWORK_TESTS: "1"
