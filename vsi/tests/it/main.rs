@@ -1,6 +1,6 @@
 //! Integration tests.
 
-use std::env;
+use std::{collections::HashSet, env};
 
 use stable_eyre::{eyre::Context, Result};
 use vsi::config;
@@ -14,7 +14,9 @@ async fn dry_run_succeeds() -> Result<()> {
     let display = config::Display::default();
 
     let result = runner::run_dry(scan, display).await?;
-    assert_eq!(result, r#"["git+foo$bar","cargo+baz$bam"]"#);
+    let parsed = serde_json::from_str::<HashSet<&str>>(&result)?;
+    let expected = HashSet::from(["git+foo$bar", "cargo+baz$bam"]);
+    assert_eq!(parsed, expected);
 
     Ok(())
 }
