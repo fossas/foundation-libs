@@ -11,7 +11,6 @@ use std::{
 
 use crossbeam::channel::{bounded, Sender};
 use derivative::Derivative;
-use tryvial::tryvial;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{
@@ -43,20 +42,18 @@ pub struct Entry {
 impl Entry {
     /// Create an instance with direct ancestry.
     /// Errors if the logical entry cannot be created.
-    #[tryvial]
     fn direct(target: Arc<WalkTarget>, dir: &Path, file: &Path) -> Result<Self, Error> {
         let logical = try_make_relative(dir, file)?;
-        Self {
+        Ok(Self {
             _target: target,
             logical: logical.to_owned(),
             concrete: file.to_owned(),
-        }
+        })
     }
 
     /// Create an instance from a walkdir entry with derived ancestry.
     ///
     /// Errors if the logical entry cannot be created.
-    #[tryvial]
     fn derived(
         target: Arc<WalkTarget>,
         parent: Option<&Path>,
@@ -64,13 +61,13 @@ impl Entry {
         file: &Path,
     ) -> Result<Self, Error> {
         let entry = Self::direct(target, dir, file)?;
-        match parent {
+        Ok(match parent {
             Some(parent) => Entry {
                 logical: parent.join(entry.logical),
                 ..entry
             },
             None => entry,
-        }
+        })
     }
 
     /// The canonical path for the entry relative to the expanding root.
