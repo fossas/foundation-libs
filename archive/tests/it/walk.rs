@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use archive::{expand::walk, Options, Recursion};
+use archive::{expand::walk, Filter, Options, Recursion};
 
 use crate::testdata::{self, assert_walked_hashed_content};
 
@@ -186,6 +186,108 @@ fn extract_nested_archives_no_recursion() {
     let expected = vec![(
         "nested.zip",
         "efa3a1b5d22aaaa0593a47434752ec405c1c40aad20252a572fb90f95507316e",
+    )];
+
+    assert_walked_hashed_content(walker, expected);
+}
+
+#[test]
+fn filters_allow() {
+    let target = testdata::target("testdata/nested");
+    let options = Options::builder()
+        .archive_postfix("")
+        .filter(
+            Filter::builder()
+                .include(HashSet::from([PathBuf::from("nested.zip/simplezip")]))
+                .build(),
+        )
+        .build();
+
+    let walker = walk(target, options);
+    let expected = vec![
+        (
+            "nested.zip/simplezip/simple.zip",
+            "65edda9e1933aa8cff1d5aeec70a8ddbd43f971454b982f101aa9beff0b72901",
+        ),
+        (
+            "nested.zip/simplezip/simple.zip/simple/a.txt",
+            "a1521f679d5583c4bac29209c655c04a6cadb68a364d448d7b43224aeffd82ce",
+        ),
+        (
+            "nested.zip/simplezip/simple.zip/simple/b.txt",
+            "367a5b6e6b67fa0c2d00dee7c91eb3f0d85a93e537335abbed7908c9f87738c8",
+        ),
+    ];
+
+    assert_walked_hashed_content(walker, expected);
+}
+
+#[test]
+fn filters_deny() {
+    let target = testdata::target("testdata/nested");
+    let options = Options::builder()
+        .archive_postfix("")
+        .filter(
+            Filter::builder()
+                .exclude(HashSet::from([PathBuf::from("nested.zip/inner.zip")]))
+                .build(),
+        )
+        .build();
+
+    let walker = walk(target, options);
+    let expected = vec![
+        (
+            "nested.zip",
+            "efa3a1b5d22aaaa0593a47434752ec405c1c40aad20252a572fb90f95507316e",
+        ),
+        (
+            "nested.zip/simple.tar.xz",
+            "1ad70c7e7dcf0ccb420ea617ec94e59747f5bc8c168e6dd506fb69e223c10615",
+        ),
+        (
+            "nested.zip/simple.tar.xz/simple/a.txt",
+            "a1521f679d5583c4bac29209c655c04a6cadb68a364d448d7b43224aeffd82ce",
+        ),
+        (
+            "nested.zip/simple.tar.xz/simple/b.txt",
+            "367a5b6e6b67fa0c2d00dee7c91eb3f0d85a93e537335abbed7908c9f87738c8",
+        ),
+        (
+            "nested.zip/simplezip/simple.zip",
+            "65edda9e1933aa8cff1d5aeec70a8ddbd43f971454b982f101aa9beff0b72901",
+        ),
+        (
+            "nested.zip/simplezip/simple.zip/simple/a.txt",
+            "a1521f679d5583c4bac29209c655c04a6cadb68a364d448d7b43224aeffd82ce",
+        ),
+        (
+            "nested.zip/simplezip/simple.zip/simple/b.txt",
+            "367a5b6e6b67fa0c2d00dee7c91eb3f0d85a93e537335abbed7908c9f87738c8",
+        ),
+    ];
+
+    assert_walked_hashed_content(walker, expected);
+}
+
+#[test]
+fn filters_allow_deny() {
+    let target = testdata::target("testdata/nested");
+    let options = Options::builder()
+        .archive_postfix("")
+        .filter(
+            Filter::builder()
+                .exclude(HashSet::from([PathBuf::from(
+                    "nested.zip/simplezip/simple.zip/simple",
+                )]))
+                .include(HashSet::from([PathBuf::from("nested.zip/simplezip")]))
+                .build(),
+        )
+        .build();
+
+    let walker = walk(target, options);
+    let expected = vec![(
+        "nested.zip/simplezip/simple.zip",
+        "65edda9e1933aa8cff1d5aeec70a8ddbd43f971454b982f101aa9beff0b72901",
     )];
 
     assert_walked_hashed_content(walker, expected);

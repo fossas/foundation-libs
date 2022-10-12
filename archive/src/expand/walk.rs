@@ -5,10 +5,12 @@ use std::{
     fs::{self, File},
     io,
     path::{Path, PathBuf},
+    sync::Arc,
     thread,
 };
 
 use crossbeam::channel::{bounded, Sender};
+use derivative::Derivative;
 use tryvial::tryvial;
 use walkdir::{DirEntry, WalkDir};
 
@@ -18,7 +20,8 @@ use crate::{
 };
 
 /// A directory entry discovered by the walker.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Entry {
     /// The logical path, relative to the expanding root.
     /// This is the path reported to clients.
@@ -26,15 +29,25 @@ pub struct Entry {
 
     /// The actual path on disk. This is hidden from clients as an implementation detail.
     concrete: PathBuf,
+
+    /// The [`WalkTarget`] containing the file to which this entry points.
+    /// This is needed because `WalkTarget` cleans up its directory once it finishes walking,
+    /// but `Entry` may live beyond that walk operation.
+    /// As long as `Entry` is around, its location on disk should be accessible.
+    ///
+    /// This field is not directly used; it is merely a sentinel to keep `WalkTarget` alive.
+    #[derivative(Debug = "ignore")]
+    _target: Arc<WalkTarget>,
 }
 
 impl Entry {
     /// Create an instance with direct ancestry.
     /// Errors if the logical entry cannot be created.
     #[tryvial]
-    fn direct(dir: &Path, file: &Path) -> Result<Self, Error> {
+    fn direct(target: Arc<WalkTarget>, dir: &Path, file: &Path) -> Result<Self, Error> {
         let logical = try_make_relative(dir, file)?;
         Self {
+            _target: target,
             logical: logical.to_owned(),
             concrete: file.to_owned(),
         }
@@ -44,12 +57,17 @@ impl Entry {
     ///
     /// Errors if the logical entry cannot be created.
     #[tryvial]
-    fn derived(parent: Option<&Path>, dir: &Path, file: &Path) -> Result<Self, Error> {
-        let entry = Self::direct(dir, file)?;
+    fn derived(
+        target: Arc<WalkTarget>,
+        parent: Option<&Path>,
+        dir: &Path,
+        file: &Path,
+    ) -> Result<Self, Error> {
+        let entry = Self::direct(target, dir, file)?;
         match parent {
             Some(parent) => Entry {
                 logical: parent.join(entry.logical),
-                concrete: entry.concrete,
+                ..entry
             },
             None => entry,
         }
@@ -166,6 +184,8 @@ fn walk_inner(tx: Sender<Result<Entry, Error>>, root: PathBuf, options: Options)
     };
 
     while let Some(target) = queue.pop_front() {
+        let target = Arc::new(target);
+
         // Attempt to expand the entry.
         // If it is a supported archive, the new expanded entry is pushed onto the stack.
         // Either way, the original entry is still returned for iteration.
@@ -191,15 +211,20 @@ fn walk_inner(tx: Sender<Result<Entry, Error>>, root: PathBuf, options: Options)
         };
 
         let parent = target.parent.as_deref();
-        let render = |de: DirEntry| Entry::derived(parent, &target.dir, de.path());
-        let allowed = |e: &Entry| options.filter.allows(e.path());
+        let render = |de: DirEntry| Entry::derived(target.clone(), parent, &target.dir, de.path());
+        let not_excludes = |e: &Entry| !options.filter.excludes(e.path());
+        let allows = |e: &Entry| options.filter.allows(e.path());
         let walk = WalkDir::new(&target.dir)
             .follow_links(false)
             .into_iter()
             .filter(|de| de.as_ref().map(|de| de.path().is_file()).unwrap_or(true))
             .flat_map(|de| de.map(render).map_err(Error::Walk))
-            .filter(|entry| entry.as_ref().map(allowed).unwrap_or(true))
+            // Filter ahead of time for block list.
+            .filter(|entry| entry.as_ref().map(not_excludes).unwrap_or(true))
             .flat_map(|entry| entry.map(&mut process))
+            // Filter after the fact for allow list.
+            // If this is filtered ahead of time, it's impossible to reach deeper filters.
+            .filter(|entry| entry.as_ref().map(allows).unwrap_or(true))
             .try_for_each(|entry| tx.send(entry));
 
         // If walk is error, it indicates the channel is closed; just exit.

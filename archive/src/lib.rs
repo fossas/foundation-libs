@@ -167,18 +167,14 @@ pub struct Filter {
 }
 
 impl Filter {
-    fn should_exclude(&self, path: &Path) -> bool {
+    /// Test whether the filters exclude the given path.
+    pub(crate) fn excludes(&self, path: &Path) -> bool {
         self.exclude.iter().any(|ex| path.starts_with(ex))
-    }
-
-    fn should_include(&self, path: &Path) -> bool {
-        self.include.is_empty() || self.include.iter().any(|inc| path.starts_with(inc))
     }
 
     /// Test whether the filters allow for the given path.
     pub(crate) fn allows(&self, path: &Path) -> bool {
-        // TODO: Replace this with a trie
-        !self.should_exclude(path) && self.should_include(path)
+        self.include.is_empty() || self.include.iter().any(|inc| path.starts_with(inc))
     }
 }
 
