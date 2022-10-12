@@ -184,7 +184,7 @@ fn walk_inner(tx: Sender<Result<Entry, Error>>, root: PathBuf, options: Options)
         let target = Arc::new(target);
 
         // Attempt to expand the entry.
-        // If it is a supported archive, the new expanded entry is pushed onto the stack.
+        // If it is a supported archive, the new expanded entry is pushed onto the queue.
         // Either way, the original entry is still returned for iteration.
         let mut process = |entry: Entry| -> Result<Entry, Error> {
             match options.recursion {
