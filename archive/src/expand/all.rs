@@ -199,7 +199,7 @@ impl Expansion {
         errs.push(warning);
     }
 
-    fn record_many(&mut self, attempts: impl Iterator<Item = Attempt>) {
+    fn record_many(&mut self, attempts: impl IntoIterator<Item = Attempt>) {
         attempts.into_iter().for_each(|a| self.record(a))
     }
 }
