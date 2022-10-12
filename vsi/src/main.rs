@@ -5,19 +5,17 @@
 #![warn(rust_2018_idioms)]
 #![deny(clippy::unwrap_used)]
 
-use std::time::{Duration, Instant};
-
 use clap::{Parser, Subcommand};
 use log::{debug, info, Level};
 use stable_eyre::{
-    eyre::{bail, ensure, Context},
+    eyre::{ensure, Context},
     Result,
 };
 use stderrlog::ColorChoice;
-use tokio::time::sleep;
 use vsi::{
-    api::{Client, Devnull, Fossa},
-    config, forensics, scan,
+    self,
+    api::{Devnull, Fossa},
+    config, scan,
 };
 
 #[derive(Parser, Debug)]
@@ -160,9 +158,9 @@ async fn main_full(CmdFull { scan, api, display }: CmdFull) -> Result<()> {
     debug!("running in full mode");
 
     let client = Fossa::new(&api, &scan).context("create client")?;
-    run_full_scan(client, scan, display)
-        .await
-        .context("run scan")
+    let result = vsi::run(client, scan, display).await.context("run scan")?;
+    println!("{result}");
+    Ok(())
 }
 
 async fn main_dryrun(CmdDryRun { scan, display }: CmdDryRun) -> Result<()> {
@@ -170,94 +168,9 @@ async fn main_dryrun(CmdDryRun { scan, display }: CmdDryRun) -> Result<()> {
     info!("running in dry run mode");
 
     let client = Devnull::new();
-    run_full_scan(client, scan, display)
-        .await
-        .context("run scan")
-}
-
-async fn run_full_scan(
-    client: impl Client + Sync,
-    scan: config::Scan,
-    display: config::Display,
-) -> Result<()> {
-    let start = Instant::now();
-
-    let id = client.create_scan().await.context("create scan")?;
-    info!("created scan: {id}");
-
-    info!("scanning artifacts");
-    let opts = scan::Options::builder().root(scan.dir()).build();
-    let artifact_count = scan::artifacts(&client, &id, opts)
-        .await
-        .context("scan artifacts")?;
-    client
-        .complete_scan(&id)
-        .await
-        .context("mark scan complete")?;
-
-    info!(
-        "completed scan of {artifact_count} artifacts in {:?}",
-        start.elapsed()
-    );
-
-    info!("waiting for forensics");
-    wait_forensics(&client, &id)
-        .await
-        .context("wait for forensics")?;
-
-    match display.export() {
-        config::Export::ScanID => println!("{{ scan_id: {id} }}"),
-        config::Export::Locators => {
-            info!("downloading results");
-            let results = client
-                .download_forensics(&id)
-                .await
-                .context("download forensics")?;
-
-            let encoded = serde_json::to_string(&results).context("render results")?;
-            println!("{encoded}");
-        }
-    }
-
+    let result = vsi::run(client, scan, display).await.context("run scan")?;
+    println!("{result}");
     Ok(())
-}
-
-/// Waits for forensics to complete or error.
-async fn wait_forensics(client: &impl Client, id: &scan::Id) -> Result<()> {
-    let start = Instant::now();
-    let delay = Duration::from_secs(1);
-    let mut last_status: Option<forensics::Status> = None;
-    loop {
-        let status = client
-            .forensics_status(id)
-            .await
-            .context("get forensics status")?;
-
-        if let Some(last_status) = &last_status {
-            if last_status == &status {
-                sleep(delay).await;
-                continue;
-            }
-        }
-
-        match status {
-            forensics::Status::Pending => {
-                info!("forensic analysis is enqueued, waiting to start...")
-            }
-            forensics::Status::Finished => {
-                info!("forensics complete in {:?}", start.elapsed());
-                return Ok(());
-            }
-            forensics::Status::Failed => {
-                bail!("forensic analysis failed");
-            }
-            forensics::Status::Informational(ref step) => {
-                info!("forensic analysis step: {step}");
-            }
-        }
-
-        last_status = Some(status);
-    }
 }
 
 /// Configures the global logger for the application based on self.

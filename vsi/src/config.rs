@@ -8,6 +8,7 @@ use stable_eyre::{
     eyre::{ensure, Context},
     Result,
 };
+use typed_builder::TypedBuilder;
 
 /// Determines which scan data is exported.
 #[derive(clap::ValueEnum, Clone, Copy, Debug)]
@@ -32,16 +33,18 @@ pub enum Format {
 }
 
 /// Configures API related information.
-#[derive(Parser, Debug, Getters, CopyGetters)]
+#[derive(Parser, Debug, Getters, CopyGetters, TypedBuilder)]
 pub struct Api {
     /// The FOSSA endpoint to which the scans are uploaded.
     #[clap(long, default_value = "https://app.fossa.com")]
     #[getset(get = "pub")]
+    #[builder(default = String::from("https://app.fossa.com"), setter(into))]
     endpoint: String,
 
     /// The FOSSA API key. Also available via the `FOSSA_API_KEY` environment variable.
     #[clap(long = "fossa-api-key", env = "FOSSA_API_KEY")]
     #[getset(get = "pub")]
+    #[builder(setter(into))]
     key: String,
 
     /// The FOSSA organization to which the scan belongs.
@@ -61,31 +64,41 @@ impl Api {
 }
 
 /// Configures how scan results are displayed.
-#[derive(Parser, Debug, Getters)]
+#[derive(Parser, Debug, Getters, TypedBuilder)]
 #[getset(get = "pub")]
 pub struct Display {
     /// The data format used to export scan data.
     #[clap(long, default_value_t = Format::Json)]
     #[arg(value_enum)]
+    #[builder(default = Format::Json)]
     format: Format,
 
     /// The data that should be exported.
     #[clap(long, default_value_t = Export::Locators)]
     #[arg(value_enum)]
+    #[builder(default = Export::Locators)]
     export: Export,
 }
 
+impl Default for Display {
+    fn default() -> Self {
+        Self::builder().build()
+    }
+}
+
 /// Configures options related to the scan.
-#[derive(Parser, Debug, Getters, CopyGetters)]
+#[derive(Parser, Debug, Getters, CopyGetters, TypedBuilder)]
 pub struct Scan {
     /// Whether to enable debug logging.
     #[clap(long, short)]
     #[getset(get_copy = "pub")]
+    #[builder(default = false)]
     debug: bool,
 
     /// The directory to fingerprint.
     #[clap()]
     #[getset(get = "pub")]
+    #[builder(setter(into))]
     dir: PathBuf,
 
     /// Paths provided here are included.
@@ -94,6 +107,7 @@ pub struct Scan {
     /// This rule holds recursively; if a parent is excluded, included children are still excluded.
     #[clap(long)]
     #[getset(get = "pub")]
+    #[builder(default)]
     only_paths: Vec<PathBuf>,
 
     /// Paths provided here are not included.
@@ -102,6 +116,7 @@ pub struct Scan {
     /// This rule holds recursively; if a parent is excluded, included children are still excluded.
     #[clap(long)]
     #[getset(get = "pub")]
+    #[builder(default)]
     exclude_paths: Vec<PathBuf>,
 }
 

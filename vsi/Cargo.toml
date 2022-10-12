@@ -35,3 +35,6 @@ fingerprint = { version = "*", path = "../fingerprint" }
 
 [target.'cfg(unix)'.dependencies]
 fingerprint = { version = "*", path = "../fingerprint", features = ["asm"] }
+
+[dev-dependencies]
+tempfile = "3.3.0"
