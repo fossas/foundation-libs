@@ -2,11 +2,11 @@
 
 use std::{
     collections::HashMap,
-    fs,
+    fs, io,
     path::{Path, PathBuf},
 };
 
-use archive::{Target, *};
+use archive::{expand::walk::Entry, Target, *};
 use log::debug;
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
@@ -63,6 +63,31 @@ pub fn target(path: impl Into<PathBuf>) -> Target {
         .build()
 }
 
+/// Assert the contents of the archive matched the provided tree of hashes using the walking iterator.
+#[track_caller]
+pub fn assert_walked_hashed_content(
+    iter: impl Iterator<Item = Result<Entry, Error>>,
+    expected: Vec<(&str, &str)>,
+) {
+    let contents = iter
+        .filter_map(|entry| entry.ok())
+        .filter_map(|mut entry| match entry.open() {
+            Ok(handle) => Some((entry.path().to_owned(), handle)),
+            Err(_) => None,
+        })
+        .map(|(path, mut handle)| {
+            let mut hasher = Sha256::new();
+            io::copy(&mut handle, &mut hasher).expect("hash file");
+            let buf = &hasher.finalize()[..];
+            (path, hex::encode(buf))
+        });
+
+    let extracted = HashMap::from_iter(contents);
+    let expected = map_expected_flat(expected);
+
+    assert_eq!(extracted, expected);
+}
+
 /// Assert the contents of the archive matched the provided tree.
 #[track_caller]
 pub fn assert_content(dest: &Path, expected: Vec<(&str, &[u8])>) {
@@ -109,5 +134,13 @@ fn map_expected<T>(root: &Path, expected: Vec<(&str, impl Into<T>)>) -> HashMap<
         expected
             .into_iter()
             .map(|(path, content)| (root.join(path), content.into())),
+    )
+}
+
+fn map_expected_flat<T>(expected: Vec<(&str, impl Into<T>)>) -> HashMap<PathBuf, T> {
+    HashMap::from_iter(
+        expected
+            .into_iter()
+            .map(|(path, content)| (PathBuf::from(path), content.into())),
     )
 }

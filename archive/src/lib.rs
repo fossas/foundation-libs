@@ -50,7 +50,7 @@ pub struct Options {
     ///
     /// This postfix does not affect the actual path on disk to which archives are expanded;
     /// this postfix is appended to the _rendered_ path on disk for children of the archive.
-    #[builder(default = String::from(DEFAULT_ARCHIVE_POSTFIX))]
+    #[builder(setter(into), default = String::from(DEFAULT_ARCHIVE_POSTFIX))]
     #[derivative(Default(value = "String::from(DEFAULT_ARCHIVE_POSTFIX)"))]
     archive_postfix: String,
 }

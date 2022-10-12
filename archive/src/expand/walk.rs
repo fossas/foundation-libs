@@ -14,7 +14,7 @@ use walkdir::{DirEntry, WalkDir};
 
 use crate::{
     strategy::{self, List},
-    Error, Options, Target,
+    Error, Options, Recursion, Target,
 };
 
 /// A directory entry discovered by the walker.
@@ -33,14 +33,11 @@ impl Entry {
     /// Errors if the logical entry cannot be created.
     #[tryvial]
     fn direct(dir: &Path, file: &Path) -> Result<Self, Error> {
-        println!("render direct entry ->\n  dir: {dir:?}\n  file: {file:?}");
         let logical = try_make_relative(dir, file)?;
-        let entry = Self {
+        Self {
             logical: logical.to_owned(),
             concrete: file.to_owned(),
-        };
-        println!("  {entry:?}");
-        entry
+        }
     }
 
     /// Create an instance from a walkdir entry with derived ancestry.
@@ -48,17 +45,14 @@ impl Entry {
     /// Errors if the logical entry cannot be created.
     #[tryvial]
     fn derived(parent: Option<&Path>, dir: &Path, file: &Path) -> Result<Self, Error> {
-        println!("render derived entry from parent {parent:?}->\n  dir: {dir:?}\n  file: {file:?}");
         let entry = Self::direct(dir, file)?;
-        let entry = match parent {
+        match parent {
             Some(parent) => Entry {
                 logical: parent.join(entry.logical),
                 concrete: entry.concrete,
             },
             None => entry,
-        };
-        println!("  {entry:?}");
-        entry
+        }
     }
 
     /// The canonical path for the entry relative to the expanding root.
@@ -72,7 +66,15 @@ impl Entry {
 
     /// Open a file handle for the entry.
     pub fn open(&mut self) -> Result<File, io::Error> {
+        // Even though this function doesn't actually mutate `Entry` itself,
+        // it _does_ allow mutation of the underlying file, so its receiver is mut.
         File::open(&self.concrete)
+    }
+
+    /// List the concrete path at which the entry is located.
+    #[cfg(test)]
+    pub fn concrete(&self) -> &Path {
+        &self.concrete
     }
 }
 
@@ -119,6 +121,7 @@ pub fn walk(target: Target, options: Options) -> impl Iterator<Item = Result<Ent
 
 struct WalkTarget {
     parent: Option<PathBuf>,
+    depth: usize,
     dir: PathBuf,
     temp: bool,
 }
@@ -127,14 +130,16 @@ impl WalkTarget {
     fn base(dir: PathBuf) -> Self {
         Self {
             dir,
+            depth: 0,
             parent: None,
             temp: false,
         }
     }
 
-    fn expanded(parent: PathBuf, dir: PathBuf) -> Self {
+    fn expanded(parent: PathBuf, dir: PathBuf, depth: usize) -> Self {
         Self {
             dir,
+            depth,
             parent: Some(parent),
             temp: true,
         }
@@ -163,15 +168,25 @@ fn walk_inner(tx: Sender<Result<Entry, Error>>, root: PathBuf, options: Options)
     while let Some(target) = queue.pop_front() {
         // Attempt to expand the entry.
         // If it is a supported archive, the new expanded entry is pushed onto the stack.
+        // Either way, the original entry is still returned for iteration.
         let mut process = |entry: Entry| -> Result<Entry, Error> {
-            match strategies.expand(&entry.concrete) {
-                Ok(expanded) => {
-                    let logical_parent = logical_suffix(&entry.logical);
-                    queue.push_back(WalkTarget::expanded(logical_parent, expanded));
-                    Ok(entry)
-                }
-                Err(strategy::Error::NotSupported) => Ok(entry),
-                Err(err) => Err(Error::Expand(err)),
+            match options.recursion {
+                Recursion::Enabled { depth } => match strategies.expand(&entry.concrete) {
+                    Ok(expanded) => {
+                        let new_depth = target.depth + 1;
+                        if new_depth > depth {
+                            // Don't recurse further if it'd exceed the recursion depth.
+                            return Ok(entry);
+                        }
+
+                        let parent = logical_suffix(&entry.logical);
+                        queue.push_back(WalkTarget::expanded(parent, expanded, new_depth));
+                        Ok(entry)
+                    }
+                    Err(strategy::Error::NotSupported) => Ok(entry),
+                    Err(err) => Err(Error::Expand(err)),
+                },
+                Recursion::Disabled => Ok(entry),
             }
         };
 
