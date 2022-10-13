@@ -1,7 +1,5 @@
 //! Unit tests.
 
-use std::{thread::sleep, time::Duration};
-
 use crate::{expand::walk, Target, DEFAULT_ARCHIVE_POSTFIX};
 
 #[test]

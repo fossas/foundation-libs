@@ -2,7 +2,7 @@
 name = "vsi"
 version = "1.0.0"
 edition = "2021"
-description = "The canonical client binary for running VSI scans"
+description = "The canonical client for running VSI scans"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
