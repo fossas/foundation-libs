@@ -35,7 +35,7 @@ pub fn comment_stripped<R: Read>(
     match hash_text_stripped(&mut stream) {
         Ok(fp) => Ok(Some(fp)),
         Err(err) => {
-            // The `io::Error` type is opaque 😭
+            // The `io::Error` type is opaque.
             // Handle the case of attempting to comment strip a binary file.
             if err.to_string().to_lowercase().contains("utf-8") {
                 Ok(None)
