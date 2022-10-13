@@ -1,6 +1,6 @@
 [package]
 name = "archive"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,9 +8,9 @@ edition = "2021"
 default = []
 
 [dependencies]
-assert_matches = "1.5.0"
 bimap = "0.6.2"
 compress-tools = "0.13.0"
+crossbeam = "0.8.2"
 derivative = "2.2.0"
 derive_more = "0.99.17"
 duplicate = "0.4.1"
@@ -23,6 +23,7 @@ typed-builder = "0.10.0"
 walkdir = "2.3.2"
 
 [dev-dependencies]
+assert_matches = "1.5.0"
 hex = "0.4.3"
 mockall = "0.11.2"
 pretty_env_logger = "0.4.0"

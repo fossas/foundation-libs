@@ -1,4 +1,7 @@
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{PathBuf, StripPrefixError},
+};
 
 use thiserror::Error;
 
@@ -48,19 +51,24 @@ pub enum Error {
     /// Reached the recursion limit.
     #[error("recursion limit")]
     RecursionLimit,
+
+    /// Attempted to render a path, but it could not be made relative.
+    #[error("render {child:?} relative to {parent:?}")]
+    RenderPathRelative {
+        /// The parent directory.
+        parent: PathBuf,
+        /// The child item, which should have been inside the parent (so it could render relative).
+        child: PathBuf,
+        /// The error encountered attempting to make the path relative.
+        #[source]
+        err: StripPrefixError,
+    },
 }
 
 /// Invariants expected by this library.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Invariant {
-    /// The target is not a subdirectory of the project root.
-    #[error("target {:?} is not a subdirectory of project root {:?}", target.root, target.project)]
-    TargetProjectSubdir {
-        /// The target provided to the archive expansion function.
-        target: Target,
-    },
-
     /// The target is not walkable. It is either not a supported archive or not a directory.
     #[error("{:?} is not walkable; it must be an archive or a directory", target.root)]
     Walkable {
