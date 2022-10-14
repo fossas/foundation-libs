@@ -20,7 +20,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use stable_eyre::{
     eyre::{ensure, Context},
-    Report, Result,
+    Result,
 };
 use tokio::{
     sync::mpsc::{channel, Receiver},
@@ -75,16 +75,8 @@ pub trait Sink {
     /// This is an associated type so that different sinks can choose their own ID types as needed.
     type Id;
 
-    /// The error type for the scan.
-    /// This is an associated type so that different sinks can choose their own errors as needed.
-    type Error;
-
     /// Add scan artifacts to a scan.
-    async fn append_scan(
-        &self,
-        id: &Self::Id,
-        artifacts: Vec<Artifact>,
-    ) -> std::result::Result<(), Self::Error>;
+    async fn append_scan(&self, id: &Self::Id, artifacts: Vec<Artifact>) -> Result<()>;
 }
 
 /// Walk the file system, generating and uploading scan artifacts in parallel.
@@ -93,11 +85,7 @@ pub trait Sink {
 /// # Resource leaking
 ///
 /// Dropping this future early can result in leaked threads.
-pub async fn artifacts<S: Sink<Id = Id, Error = Report>>(
-    client: &S,
-    id: &S::Id,
-    opts: Options,
-) -> Result<usize> {
+pub async fn artifacts<S: Sink<Id = Id>>(client: &S, id: &S::Id, opts: Options) -> Result<usize> {
     debug!("scanning artifacts for scan {} at {:?}", id, opts.root);
     defer! { debug!("exited scanning artifacts"); }
 
@@ -129,7 +117,7 @@ pub async fn artifacts<S: Sink<Id = Id, Error = Report>>(
 /// Returns the number of artifacts uploaded.
 ///
 /// Returns with an error if an error is encountered during the upload.
-async fn upload<S: Sink<Id = Id, Error = Report>>(
+async fn upload<S: Sink<Id = Id>>(
     client: &S,
     id: &S::Id,
     mut rx: Receiver<Artifact>,

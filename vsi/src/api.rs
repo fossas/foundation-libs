@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
-use stable_eyre::{Report, Result};
+use stable_eyre::Result;
 
 mod devnull;
 mod fossa;
@@ -55,7 +55,6 @@ pub trait Client {
 #[async_trait]
 impl<T: Client + Sync> scan::Sink for T {
     type Id = scan::Id;
-    type Error = Report;
 
     async fn append_scan(&self, id: &Self::Id, artifacts: Vec<scan::Artifact>) -> Result<()> {
         self.append_scan(id, artifacts).await
