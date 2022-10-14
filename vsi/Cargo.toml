@@ -16,7 +16,6 @@ derive_more = "0.99.17"
 getset = "0.1.2"
 lazy_static = "1.4.0"
 log = "0.4.17"
-mockall = "0.11.2"
 num-format = { version = "0.4.0" }
 pretty_env_logger = "0.4.0"
 rayon = "1.5.3"
@@ -33,3 +32,4 @@ fingerprint = { version = "*", path = "../fingerprint" }
 
 [dev-dependencies]
 tempfile = "3.3.0"
+mockall = "0.11.2"

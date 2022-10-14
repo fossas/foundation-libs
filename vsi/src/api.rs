@@ -36,7 +36,7 @@ pub trait Client {
     async fn create_scan(&self) -> Result<scan::Id>;
 
     /// Add scan artifacts to a scan.
-    async fn append_scan(&self, id: &scan::Id, artifacts: Vec<scan::Artifact>) -> Result<()>;
+    async fn append_artifacts(&self, id: &scan::Id, artifacts: Vec<scan::Artifact>) -> Result<()>;
 
     /// Complete a scan. This signals to the VSI Forensics Service that no new artifacts will be uploaded after this point.
     async fn complete_scan(&self, id: &scan::Id) -> Result<()>;

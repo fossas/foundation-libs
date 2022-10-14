@@ -148,7 +148,7 @@ impl super::Client for Fossa {
     }
 
     /// Add scan artifacts to a scan.
-    async fn append_scan(&self, id: &scan::Id, artifacts: Vec<scan::Artifact>) -> Result<()> {
+    async fn append_artifacts(&self, id: &scan::Id, artifacts: Vec<scan::Artifact>) -> Result<()> {
         #[derive(Debug, Serialize)]
         struct ReqBody {
             #[serde(rename = "ScanData")]

@@ -24,7 +24,7 @@ impl super::Client for Devnull {
     }
 
     /// Add scan artifacts to a scan.
-    async fn append_scan(&self, id: &scan::Id, artifacts: Vec<scan::Artifact>) -> Result<()> {
+    async fn append_artifacts(&self, id: &scan::Id, artifacts: Vec<scan::Artifact>) -> Result<()> {
         debug!(
             "[dryrun] append {} artifact(s) to scan {id}:",
             artifacts.len()

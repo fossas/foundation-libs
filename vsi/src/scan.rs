@@ -87,7 +87,7 @@ pub trait Sink {
 #[async_trait]
 impl<T: Client + Sync> Sink for T {
     async fn append_scan(&self, id: &Id, artifacts: Vec<Artifact>) -> Result<()> {
-        self.append_scan(id, artifacts).await
+        self.append_artifacts(id, artifacts).await
     }
 }
 
