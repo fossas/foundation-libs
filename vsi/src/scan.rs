@@ -28,6 +28,8 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
+use crate::api::Client;
+
 mod walk;
 
 const ARTIFACT_BUFFER_LIMIT: usize = 1000;
@@ -68,15 +70,18 @@ impl Artifact {
     }
 }
 
-/// A storage location to which scanned artifacts are uploaded.
+/// A representation of the VSI Forensics Service to which artifacts are uploaded.
 #[async_trait]
 pub trait Sink {
-    /// The identifier for the overall scan.
-    /// This is an associated type so that different sinks can choose their own ID types as needed.
-    type Id;
-
     /// Add scan artifacts to a scan.
-    async fn append_scan(&self, id: &Self::Id, artifacts: Vec<Artifact>) -> Result<()>;
+    async fn append_scan(&self, id: &Id, artifacts: Vec<Artifact>) -> Result<()>;
+}
+
+#[async_trait]
+impl<T: Client + Sync> Sink for T {
+    async fn append_scan(&self, id: &Id, artifacts: Vec<Artifact>) -> Result<()> {
+        self.append_scan(id, artifacts).await
+    }
 }
 
 /// Walk the file system, generating and uploading scan artifacts in parallel.
@@ -85,7 +90,7 @@ pub trait Sink {
 /// # Resource leaking
 ///
 /// Dropping this future early can result in leaked threads.
-pub async fn artifacts<S: Sink<Id = Id>>(client: &S, id: &S::Id, opts: Options) -> Result<usize> {
+pub async fn artifacts<S: Sink>(client: &S, id: &Id, opts: Options) -> Result<usize> {
     debug!("scanning artifacts for scan {} at {:?}", id, opts.root);
     defer! { debug!("exited scanning artifacts"); }
 
@@ -117,11 +122,7 @@ pub async fn artifacts<S: Sink<Id = Id>>(client: &S, id: &S::Id, opts: Options) 
 /// Returns the number of artifacts uploaded.
 ///
 /// Returns with an error if an error is encountered during the upload.
-async fn upload<S: Sink<Id = Id>>(
-    client: &S,
-    id: &S::Id,
-    mut rx: Receiver<Artifact>,
-) -> Result<usize> {
+async fn upload<S: Sink>(client: &S, id: &Id, mut rx: Receiver<Artifact>) -> Result<usize> {
     debug!("running uploader");
     defer! { debug!("exited uploader"); }
     let mut uploaded = 0;

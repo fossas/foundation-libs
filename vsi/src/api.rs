@@ -50,13 +50,3 @@ pub trait Client {
     /// Each locator represents a direct dependency.
     async fn download_forensics(&self, id: &scan::Id) -> Result<HashSet<Locator>>;
 }
-
-/// Blanket implement anything that implements a thread safe client as a scan sink.
-#[async_trait]
-impl<T: Client + Sync> scan::Sink for T {
-    type Id = scan::Id;
-
-    async fn append_scan(&self, id: &Self::Id, artifacts: Vec<scan::Artifact>) -> Result<()> {
-        self.append_scan(id, artifacts).await
-    }
-}
