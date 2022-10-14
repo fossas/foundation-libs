@@ -21,6 +21,10 @@
 //! 6. Eventually, the VSI Forensics Service finishes making its determinations and reports its results.
 //!    The results are downloaded as either a map of `(Path, Component ID)` pairs, or a list of locators.
 //!    Component ID is internal to the VSI Forensics Service, so generally the list of locators is used.
+//!
+//! This library is _primarily_ intended to be used by the `vsi` binary.
+//! However, it is also a goal to support use in other binaries; the plan is to improve the "library" semantics
+//! in future PRs (for example, replacing `eyre` usage with proper errors and improving flexibility).
 
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
