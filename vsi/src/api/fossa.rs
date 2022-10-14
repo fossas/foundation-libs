@@ -143,15 +143,6 @@ impl super::Client for Fossa {
             .json(&req_body);
 
         let res_body = run_req!(download, req, url, req_body);
-        // let res = req.send().await.context("send request")?;
-        // let status = res.status();
-        // let res_body = res.text().await.context("download body")?;
-        // if !status.is_success() {
-        //     let status = status.as_u16();
-        //     let req_body = to_string(&req_body)?;
-        //     bail!("status({status}); url({url}); req({req_body}); res({res_body})")
-        // }
-
         let ResBody { scan_id } = parse!(&res_body)?;
         Ok(scan_id)
     }
@@ -179,15 +170,6 @@ impl super::Client for Fossa {
             .json(&req_body);
 
         run_req!(ignore, req, url, req_body);
-        // let res = req.send().await.context("send request")?;
-        // let status = res.status();
-        // if !status.is_success() {
-        //     let status = status.as_u16();
-        //     let req_body = to_string(&req_body)?;
-        //     let res_body = res.text().await.context("download body")?;
-        //     bail!("status({status}); url({url}); req({req_body}); res({res_body})")
-        // }
-
         Ok(())
     }
 
@@ -216,15 +198,6 @@ impl super::Client for Fossa {
             .json(&req_body);
 
         run_req!(ignore, req, url, req_body);
-        // let res = req.send().await.context("send request")?;
-        // let status = res.status();
-        // if !status.is_success() {
-        //     let status = status.as_u16();
-        //     let req_body = to_string(&req_body)?;
-        //     let res_body = res.text().await.context("download body")?;
-        //     bail!("status({status}); url({url}); req({req_body}); res({res_body})")
-        // }
-
         Ok(())
     }
 
@@ -244,14 +217,6 @@ impl super::Client for Fossa {
 
         let req = self.client.get(url.clone()).bearer_auth(&self.api_key);
         let res_body = run_req!(download, req, url);
-        // let res = req.send().await.context("send request")?;
-        // let status = res.status();
-        // let res_body = res.text().await.context("download body")?;
-        // if !status.is_success() {
-        //     let status = status.as_u16();
-        //     bail!("status({status}); url({url}); req(None); res({res_body})")
-        // }
-
         let ResBody { status } = parse!(res_body)?;
         Ok(forensics::Status::parse(status))
     }
@@ -275,14 +240,6 @@ impl super::Client for Fossa {
 
         let req = self.client.get(url.clone()).bearer_auth(&self.api_key);
         let res_body = run_req!(download, req, url);
-        // let res = req.send().await.context("send request")?;
-        // let status = res.status();
-        // let res_body = res.text().await.context("download body")?;
-        // if !status.is_success() {
-        //     let status = status.as_u16();
-        //     bail!("status({status}); url({url}); req(None); res({res_body})")
-        // }
-
         let ResBody { locators } = parse!(res_body)?;
         Ok(HashSet::from_iter(locators.into_iter()))
     }
