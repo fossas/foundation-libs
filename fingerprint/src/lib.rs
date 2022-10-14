@@ -12,6 +12,11 @@
 //!
 //! For more information, refer to the documentation for the types below.
 
+#![deny(unsafe_code)]
+#![deny(missing_docs)]
+#![warn(rust_2018_idioms)]
+#![deny(clippy::unwrap_used)]
+
 use std::{
     fmt::Display,
     fs::File,
@@ -20,8 +25,7 @@ use std::{
     path::Path,
 };
 
-use derive_getters::Getters;
-
+use getset::Getters;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -40,22 +44,6 @@ pub enum Error {
     /// This error may be retried, but if it fails multiple times it's generally not recoverable.
     #[error("i/o error: {0}")]
     IO(#[from] io::Error),
-
-    /// An invariant was not followed. These errors are not recoverable and indicate a program bug.
-    #[error("invariant: {0}")]
-    Invariant(InvariantError),
-
-    /// Unimplemented functionality. This is temporary while this library is under development.
-    /// Testing `todo` panics with `join` is annoying.
-    #[error("unimplemented: {0}")]
-    Unimplemented(String),
-}
-
-/// Kinds of invariants that may be reported in [`Error::Invariant`].
-#[derive(Error, Debug, Eq, PartialEq)]
-pub enum InvariantError {
-    #[error("the resulting hash digest was not 32 bytes")]
-    HashDigestSize,
 }
 
 /// Fingerprint kinds MUST maintain exact implementation compatibility; once the algorithm for a given kind
@@ -137,20 +125,40 @@ impl Display for CommentStrippedSHA256 {
 }
 
 /// An array of bytes representing a fingerprint's content.
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Default, Serialize, Deserialize)]
-pub struct Blob([u8; 32]);
+///
+/// Must be encoded as hex to be compatible with the FOSSA backend.
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
+pub struct Blob(Vec<u8>);
 
 impl Blob {
     fn from_digest<D: Digest>(digest: D) -> Result<Blob, Error> {
-        let buf = &digest.finalize()[..];
-        let fixed = buf
-            .try_into()
-            .map_err(|_| Error::Invariant(InvariantError::HashDigestSize))?;
-        Ok(Blob(fixed))
+        let buf = digest.finalize().as_slice().to_vec();
+        Ok(Blob(buf))
     }
 
+    /// Reference the bytes inside the blob.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl Serialize for Blob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&hex::encode(&self.0))
+    }
+}
+
+impl<'de> Deserialize<'de> for Blob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let b = hex::decode(s).map_err(serde::de::Error::custom)?;
+        Ok(Self(b))
     }
 }
 
@@ -163,11 +171,35 @@ pub trait Hashable {
 
 /// An opaque, deterministic value for the file's contents.
 /// If two fingerprints are the same, the contents of the files used to create the fingerprints are the same.
-#[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Getters, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Getters)]
 #[cfg_attr(test, derive(TypedBuilder))]
+#[getset(get = "pub")]
 pub struct Fingerprint<K: Kind> {
+    #[getset(skip)]
     kind: PhantomData<K>,
+    /// The content of the blob.
     content: Blob,
+}
+
+impl<K: Kind> Serialize for Fingerprint<K> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.content.serialize(serializer)
+    }
+}
+
+impl<'de, K: Kind> Deserialize<'de> for Fingerprint<K> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self {
+            content: Blob::deserialize(deserializer)?,
+            kind: PhantomData {},
+        })
+    }
 }
 
 impl<K> Fingerprint<K>
@@ -210,7 +242,7 @@ where
     K: Kind,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.content.0))
+        write!(f, "{}", hex::encode(&self.content.0))
     }
 }
 
@@ -223,10 +255,15 @@ where
 /// in the resulting data structure, because that kind of fingerprint requires UTF8 encoded text content to run.
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Getters, Serialize, Deserialize)]
 #[cfg_attr(test, derive(TypedBuilder))]
+#[getset(get = "pub")]
 pub struct Combined {
+    /// This fingerprint is derived regardless of the kind of file.
     // Important: if this struct is changed, update `serialize::kind::kinds_evaluated` to reflect the change.
     // `kinds_evaluated` may be replaced by a macro in the future.
+    #[serde(rename = "sha_256")]
     raw: Fingerprint<RawSHA256>,
+    /// The fingerprint derived when the file is a text file, and any C-style comments have been removed.
+    #[serde(rename = "comment_stripped:sha_256")]
     comment_stripped: Option<Fingerprint<CommentStrippedSHA256>>,
 }
 
@@ -242,6 +279,20 @@ impl Combined {
             vec![raw, stripped.to_hash()]
         } else {
             vec![raw]
+        }
+    }
+}
+
+impl Display for Combined {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(comment_stripped) = &self.comment_stripped {
+            write!(
+                f,
+                "{}({}); {}({})",
+                RawSHA256, self.raw, CommentStrippedSHA256, comment_stripped,
+            )
+        } else {
+            write!(f, "{}({})", RawSHA256, self.raw())
         }
     }
 }

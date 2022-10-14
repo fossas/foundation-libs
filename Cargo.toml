@@ -3,6 +3,7 @@ members = [
   "archive",
   "berkeleydb",
   "fingerprint",
+  "vsi",
 ]
 
 [profile.dev.package.backtrace]

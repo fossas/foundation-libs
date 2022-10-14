@@ -1,7 +1,5 @@
 //! Unit tests.
 
-use std::{thread::sleep, time::Duration};
-
 use crate::{expand::walk, Target, DEFAULT_ARCHIVE_POSTFIX};
 
 #[test]
@@ -25,9 +23,8 @@ fn walk_removes_dirs() {
         }
     }
 
-    // Let some time pass: temp directories are cleaned up on drop, so this process may not be instant.
-    sleep(Duration::from_millis(100));
-
+    // Temp directories are cleaned up on drop, and drop runs in the foreground: https://abramov.io/rust-dropping-things-in-another-thread
+    // Now that the original `WalkTarget`s have been dropped, ensure that their directories were deleted.
     assert!(!temp_paths.is_empty());
     for (concrete, rendered) in temp_paths {
         assert!(

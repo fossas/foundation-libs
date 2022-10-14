@@ -27,3 +27,7 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - run: cargo check --release --all --bins --examples --tests
       - run: cargo nextest run
+        env:
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+          FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
+          ENABLE_NETWORK_TESTS: "1"

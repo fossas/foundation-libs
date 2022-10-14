@@ -1,0 +1,35 @@
+[package]
+name = "vsi"
+version = "1.0.0"
+edition = "2021"
+description = "The canonical client for running VSI scans"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.57"
+atty = "0.2.14"
+cancel = "0.1.0"
+clap = { version = "4.0.4", features = ["derive", "cargo", "env"] }
+defer-lite = "1.0.0"
+derive_more = "0.99.17"
+getset = "0.1.2"
+lazy_static = "1.4.0"
+log = "0.4.17"
+num-format = { version = "0.4.0" }
+pretty_env_logger = "0.4.0"
+rayon = "1.5.3"
+reqwest = { version = "0.11.12", features = ["json"] }
+serde = { version = "1.0.145", features = ["derive"] }
+serde_json = "1.0.85"
+stable-eyre = "0.2.2"
+stderrlog = "0.5.3"
+strum = { version = "0.24.1", features = ["derive"] }
+tokio = { version = "1.21.2", features = ["full"] }
+typed-builder = "0.10.0"
+walkdir = "2.3.2"
+fingerprint = { version = "*", path = "../fingerprint" }
+
+[dev-dependencies]
+tempfile = "3.3.0"
+mockall = "0.11.2"
