@@ -48,6 +48,13 @@ pub struct Options {
 )]
 pub struct Id(String);
 
+impl Id {
+    /// Construct a new instance.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+}
+
 /// An artifact in a scan.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Artifact(PathBuf, fingerprint::Combined);
