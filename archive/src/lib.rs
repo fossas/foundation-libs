@@ -179,7 +179,7 @@ impl Filter {
 }
 
 /// The target of an expansion operation.
-#[derive(Clone, Debug, TypedBuilder, Getters)]
+#[derive(Clone, Debug, TypedBuilder, Getters, From)]
 pub struct Target {
     /// The directory within `project_root` that is being expanded.
     #[builder(setter(into))]

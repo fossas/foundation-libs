@@ -86,6 +86,15 @@ impl Entry {
         File::open(&self.concrete)
     }
 
+    /// Consume the `Entry` and return the canonical path relative to the expanding root.
+    ///
+    /// Note that this path is only usable for recording purposes, and the path is not
+    /// suitable for opening. Additionally, the true underlying path may be deleted once
+    /// the `Entry` is dropped, making this
+    pub fn into_path(self) -> PathBuf {
+        self.logical
+    }
+
     /// List the concrete path at which the entry is located.
     #[cfg(test)]
     pub fn concrete(&self) -> &Path {
