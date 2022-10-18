@@ -1,11 +1,12 @@
 use std::{
+    io::BufReader,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use cancel::Token;
 use defer_lite::defer;
-use fingerprint::fingerprint;
+use fingerprint::fingerprint_stream;
 use log::{debug, info};
 use num_format::{Locale, ToFormattedString};
 use rayon::prelude::*;
@@ -14,7 +15,6 @@ use stable_eyre::{
     Result,
 };
 use tokio::{sync::mpsc::Sender, task};
-use walkdir::{DirEntry, WalkDir};
 
 const REPORT_TIMEOUT: Duration = Duration::from_secs(1);
 
@@ -76,15 +76,8 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
     let mut last_report = Instant::now();
 
     use stable_eyre::eyre::Context;
-    WalkDir::new(&opts.root)
-        .follow_links(false)
-        // Produces an iterator over recursive contents of the directory.
-        .into_iter()
-        // User-provided filters.
-        .filter_entry(|de| matches_filters(de, &opts))
-        // Only attempt to process files for fingerprints.
-        // Pass along errors too, so that the error can be reported.
-        .filter(is_file_or_err)
+
+    archive::expand::walk(opts.root().clone().into(), Default::default())
         // Collect and report in the iterator before it becomes parallel; iteration here is serial.
         // Iterators are lazy so this still benefits from parallel operations.
         .inspect(|_| {
@@ -100,18 +93,22 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
         })
         // Rayon magic: turn this iterator into a parallel iterator, then generate each artifact in parallel.
         .par_bridge()
-        .try_for_each(|de| -> Result<()> {
+        .try_for_each(|entry| -> Result<()> {
+            let mut entry = entry?;
             if token.check_cancel().is_err() {
                 debug!("received cancellation signal, bailing");
                 bail!("cancellation requested");
             }
 
             // Fingerprint the file.
-            let path = de.map(|de| de.into_path()).context("iterate contents")?;
-            let combined = fingerprint(&path).wrap_err_with(|| eyre!("fingerprint {path:?}"))?;
+            // Reading an [`Entry`] requires using [`Entry::open`], since its paths are tightly controlled.
+            // This prevents us from using `fingerprint` with a standard `Path`.
+            let mut file = BufReader::new(entry.open()?);
+            let combined = fingerprint_stream(&mut file)
+                .wrap_err_with(|| eyre!("fingerprint {:?}", entry.path()))?;
 
             // Generate and send the artifact.
-            let artifact = Artifact(path, combined);
+            let artifact = Artifact(entry.into_path(), combined);
             debug!("generated artifact: {artifact}");
             out.blocking_send(artifact).context("send entry")?;
 
@@ -123,13 +120,4 @@ fn fs_worker(token: Arc<Token>, out: Sender<Artifact>, opts: Options) -> Result<
         produced.to_formatted_string(&Locale::en)
     );
     Ok(produced)
-}
-
-fn matches_filters(_: &DirEntry, _: &Options) -> bool {
-    // TODO: implement filtering
-    true
-}
-
-fn is_file_or_err<E>(de: &Result<DirEntry, E>) -> bool {
-    de.as_ref().map(|de| de.path().is_file()).unwrap_or(true)
 }
