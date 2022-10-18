@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use crate::{stream::ConvertCRLFToLF, CommentStrippedSHA256, Error, Fingerprint, RawSHA256};
 
 /// Fingerprint the file using the [`RawSHA256`] kind.
-pub fn raw<R: Read>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
+pub fn raw<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
     // Read the start of the stream, and decide whether to treat the rest of the stream as binary based on that.
     let BinaryCheck { read, is_binary } = content_is_binary(stream)?;
 
@@ -21,7 +21,7 @@ pub fn raw<R: Read>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
 }
 
 /// Fingerprint the file using the [`CommentStrippedSHA256`] kind.
-pub fn comment_stripped<R: Read>(
+pub fn comment_stripped<R: BufRead>(
     stream: &mut R,
 ) -> Result<Option<Fingerprint<CommentStrippedSHA256>>, Error> {
     // Read the start of the stream, and decide whether to treat the rest of the stream as binary based on that.
@@ -65,7 +65,7 @@ fn content_is_binary<R: Read>(stream: &mut R) -> Result<BinaryCheck, io::Error> 
 }
 
 /// Hashes the exact contents of a binary file without modification.
-fn hash_binary<R: Read>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
+fn hash_binary<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
     let mut hasher = Sha256::new();
     io::copy(stream, &mut hasher)?;
     Fingerprint::from_digest(hasher)
@@ -78,7 +78,7 @@ fn hash_binary<R: Read>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error>
 /// - `git` implementations on Windows typically check out files with `\r\n` line endings,
 ///   while *nix checks them out with `\n`.
 ///   To be platform independent, any `\r\n` byte sequences found are converted to a single `\n`.
-fn hash_text<R: Read>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
+fn hash_text<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
     let stream = BufReader::new(stream).bytes().crlf_to_lf().fuse();
     let mut hasher = Sha256::new();
     io::copy(&mut IterRead::new(stream), &mut hasher)?;
@@ -98,7 +98,7 @@ fn hash_text<R: Read>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
 ///   - This function does not check for escaped comments.
 /// - Any sequence of multiple contiguous `\n` bytes are collapsed to a single `\n` byte.
 /// - The final `\n` byte is removed from the end of the stream if present.
-fn hash_text_stripped<R: Read>(
+fn hash_text_stripped<R: BufRead>(
     stream: &mut R,
 ) -> Result<Fingerprint<CommentStrippedSHA256>, Error> {
     let mut hasher = Sha256::new();
@@ -106,11 +106,11 @@ fn hash_text_stripped<R: Read>(
     Fingerprint::from_digest(hasher)
 }
 
-fn comment_strip<R: Read, W: Write>(stream: &mut R, w: &mut W) -> Result<(), Error> {
+fn comment_strip<R: BufRead, W: Write>(stream: &mut R, w: &mut W) -> Result<(), Error> {
     let mut buffered_output_line = String::new();
     let mut is_multiline_active = false;
 
-    for line in BufReader::new(stream).lines() {
+    for line in stream.lines() {
         let line = line?;
 
         // At this point we know we have a new line coming. If a previous line is buffered and ready to write, do so now.
