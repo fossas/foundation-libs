@@ -1,6 +1,7 @@
 //! Integration tests.
 
 use std::collections::HashMap;
+
 use std::sync::Arc;
 use std::{collections::HashSet, env};
 
@@ -99,6 +100,8 @@ async fn archive_scan_produces_correct_prints() -> Result<()> {
         })
         .collect();
 
+    let pathsep = std::path::MAIN_SEPARATOR;
+
     let simple_actual = result_map.get("simple.zip").map(|s| s.as_str());
     let simple_zip_expected =
         "sha_256(65edda9e1933aa8cff1d5aeec70a8ddbd43f971454b982f101aa9beff0b72901)";
@@ -109,13 +112,17 @@ async fn archive_scan_produces_correct_prints() -> Result<()> {
     );
 
     let a_actual = result_map
-        .get("simple.zip!_fossa.virtual_!/simple/a.txt")
+        .get(&format!(
+            "simple.zip!_fossa.virtual_!{pathsep}simple{pathsep}a.txt"
+        ))
         .map(|s| s.as_str());
     let a_expected = "sha_256(a1521f679d5583c4bac29209c655c04a6cadb68a364d448d7b43224aeffd82ce); comment_stripped:sha_256(a1521f679d5583c4bac29209c655c04a6cadb68a364d448d7b43224aeffd82ce)";
     assert_eq!(a_actual, Some(a_expected), "comparing a.txt");
 
     let b_actual = result_map
-        .get("simple.zip!_fossa.virtual_!/simple/b.txt")
+        .get(&format!(
+            "simple.zip!_fossa.virtual_!{pathsep}simple{pathsep}b.txt"
+        ))
         .map(|s| s.as_str());
     let b_expected = "sha_256(367a5b6e6b67fa0c2d00dee7c91eb3f0d85a93e537335abbed7908c9f87738c8); comment_stripped:sha_256(367a5b6e6b67fa0c2d00dee7c91eb3f0d85a93e537335abbed7908c9f87738c8)";
     assert_eq!(b_actual, Some(b_expected), "comparing b.txt");
