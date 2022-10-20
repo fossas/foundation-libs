@@ -90,7 +90,8 @@ impl Entry {
     ///
     /// Note that this path is only usable for recording purposes, and the path is not
     /// suitable for opening. Additionally, the true underlying path may be deleted once
-    /// the `Entry` is dropped, making this
+    /// the `Entry` is dropped, making this doubly unsuitable for anything other than
+    /// reporting.
     pub fn into_path(self) -> PathBuf {
         self.logical
     }
