@@ -102,7 +102,11 @@ async fn archive_scan_produces_correct_prints() -> Result<()> {
     let simple_actual = result_map.get("simple.zip").map(|s| s.as_str());
     let simple_zip_expected =
         "sha_256(65edda9e1933aa8cff1d5aeec70a8ddbd43f971454b982f101aa9beff0b72901)";
-    assert_eq!(simple_actual, Some(simple_zip_expected), "comparing simple.zip");
+    assert_eq!(
+        simple_actual,
+        Some(simple_zip_expected),
+        "comparing simple.zip"
+    );
 
     let a_actual = result_map
         .get("simple.zip!_fossa.virtual_!/simple/a.txt")
