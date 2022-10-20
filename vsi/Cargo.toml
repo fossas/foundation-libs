@@ -28,6 +28,7 @@ strum = { version = "0.24.1", features = ["derive"] }
 tokio = { version = "1.21.2", features = ["full"] }
 typed-builder = "0.10.0"
 walkdir = "2.3.2"
+archive = { version = "*", path = "../archive" }
 fingerprint = { version = "*", path = "../fingerprint" }
 
 [dev-dependencies]

@@ -16,6 +16,7 @@ use std::{fmt::Display, path::PathBuf};
 use async_trait::async_trait;
 use defer_lite::defer;
 use derive_more::{Display, From};
+use getset::Getters;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use stable_eyre::{
@@ -35,10 +36,11 @@ mod walk;
 const ARTIFACT_BUFFER_LIMIT: usize = 1000;
 
 /// Options for the scan process.
-#[derive(Clone, Eq, PartialEq, Debug, TypedBuilder)]
+#[derive(Clone, Eq, PartialEq, Debug, TypedBuilder, Getters)]
 pub struct Options {
     /// The directory to walk.
     #[builder(setter(into))]
+    #[getset(get)]
     root: PathBuf,
 }
 

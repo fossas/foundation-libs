@@ -20,7 +20,7 @@
 use std::{
     fmt::Display,
     fs::File,
-    io::{self, Read, Seek},
+    io::{self, BufRead, BufReader, Seek},
     marker::PhantomData,
     path::Path,
 };
@@ -299,12 +299,12 @@ impl Display for Combined {
 
 /// Fingerprint the provided file with all fingerprint [`Kind`]s.
 pub fn fingerprint(path: &Path) -> Result<Combined, Error> {
-    let mut file = File::open(path)?;
+    let mut file = BufReader::new(File::open(path)?);
     fingerprint_stream(&mut file)
 }
 
 /// Fingerprint the provided stream (typically a file handle) with all fingerprint [`Kind`]s.
-pub fn fingerprint_stream<R: Read + Send + Seek + 'static>(
+pub fn fingerprint_stream<R: BufRead + Send + Seek + 'static>(
     stream: &mut R,
 ) -> Result<Combined, Error> {
     let raw = fingerprint::raw(stream)?;
