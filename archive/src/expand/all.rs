@@ -190,7 +190,7 @@ impl Expansion {
     }
 
     fn warn(&mut self, source: PathBuf, warning: Error) {
-        let errs = self.warnings.entry(Source::from(source)).or_insert(vec![]);
+        let errs = self.warnings.entry(Source::from(source)).or_default();
         errs.push(warning);
     }
 
