@@ -12,12 +12,14 @@ pub fn raw<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> 
 
     // Chain the part of the stream already read to evaluate binary along with the rest of the stream.
     let mut stream = Cursor::new(read).chain(stream);
-    let print = if is_binary {
-        hash_binary(&mut stream)
+    let mut hasher = Sha256::new();
+    if is_binary {
+        content_binary(&mut stream, &mut hasher)?;
     } else {
-        hash_text(&mut stream)
-    }?;
-    Ok(print)
+        content_text(&mut stream, &mut hasher)?;
+    }
+
+    Fingerprint::from_digest(hasher)
 }
 
 /// Fingerprint the file using the [`CommentStrippedSHA256`] kind.
@@ -32,8 +34,9 @@ pub fn comment_stripped<R: BufRead>(
 
     // Chain the part of the stream already read to evaluate binary along with the rest of the stream.
     let mut stream = Cursor::new(read).chain(stream);
-    match hash_text_stripped(&mut stream) {
-        Ok(fp) => Ok(Some(fp)),
+    let mut hasher = Sha256::new();
+    match content_stripped(&mut stream, &mut hasher) {
+        Ok(_) => Some(Fingerprint::from_digest(hasher)).transpose(),
         Err(err) => {
             // The `io::Error` type is opaque.
             // Handle the case of attempting to comment strip a binary file.
@@ -46,15 +49,16 @@ pub fn comment_stripped<R: BufRead>(
     }
 }
 
-struct BinaryCheck {
-    read: Vec<u8>,
-    is_binary: bool,
+/// The result of checking a file for whether it is binary.
+pub(crate) struct BinaryCheck {
+    pub(crate) read: Vec<u8>,
+    pub(crate) is_binary: bool,
 }
 
 /// Inspect the file to determine if it is binary.
 ///
 /// Uses the same method as git: "is there a zero byte in the first 8000 bytes of the file"
-fn content_is_binary<R: Read>(stream: &mut R) -> Result<BinaryCheck, io::Error> {
+pub(crate) fn content_is_binary<R: Read>(stream: &mut R) -> Result<BinaryCheck, io::Error> {
     let mut buf = Vec::new();
     stream.take(8000).read_to_end(&mut buf)?;
     let is_binary = buf.contains(&0);
@@ -64,25 +68,23 @@ fn content_is_binary<R: Read>(stream: &mut R) -> Result<BinaryCheck, io::Error> 
     })
 }
 
-/// Hashes the exact contents of a binary file without modification.
-fn hash_binary<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
-    let mut hasher = Sha256::new();
-    io::copy(stream, &mut hasher)?;
-    Fingerprint::from_digest(hasher)
+/// Reads the exact contents of a binary file without modification.
+pub(crate) fn content_binary(stream: &mut impl BufRead, w: &mut impl Write) -> Result<(), Error> {
+    io::copy(stream, w)?;
+    Ok(())
 }
 
-/// Hashes text files in a platform independent manner.
+/// Reads text files in a platform independent manner.
 ///
 /// Specifically:
 /// - All text encodings are ignored; this function operates on raw bytes.
 /// - `git` implementations on Windows typically check out files with `\r\n` line endings,
 ///   while *nix checks them out with `\n`.
 ///   To be platform independent, any `\r\n` byte sequences found are converted to a single `\n`.
-fn hash_text<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error> {
+pub(crate) fn content_text(stream: &mut impl BufRead, w: &mut impl Write) -> Result<(), Error> {
     let stream = BufReader::new(stream).bytes().crlf_to_lf().fuse();
-    let mut hasher = Sha256::new();
-    io::copy(&mut IterRead::new(stream), &mut hasher)?;
-    Fingerprint::from_digest(hasher)
+    io::copy(&mut IterRead::new(stream), w)?;
+    Ok(())
 }
 
 /// Hashes code files while removing C-style comments and blank lines in a platform independent manner.
@@ -98,15 +100,7 @@ fn hash_text<R: BufRead>(stream: &mut R) -> Result<Fingerprint<RawSHA256>, Error
 ///   - This function does not check for escaped comments.
 /// - Any sequence of multiple contiguous `\n` bytes are collapsed to a single `\n` byte.
 /// - The final `\n` byte is removed from the end of the stream if present.
-fn hash_text_stripped<R: BufRead>(
-    stream: &mut R,
-) -> Result<Fingerprint<CommentStrippedSHA256>, Error> {
-    let mut hasher = Sha256::new();
-    comment_strip(stream, &mut hasher)?;
-    Fingerprint::from_digest(hasher)
-}
-
-fn comment_strip<R: BufRead, W: Write>(stream: &mut R, w: &mut W) -> Result<(), Error> {
+pub(crate) fn content_stripped(stream: &mut impl BufRead, w: &mut impl Write) -> Result<(), Error> {
     let mut buffered_output_line = String::new();
     let mut is_multiline_active = false;
 
@@ -180,7 +174,7 @@ return code;
 }"#;
 
         let mut buf = Vec::new();
-        comment_strip(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
+        content_stripped(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
         assert_eq!(expected, String::from_utf8_lossy(&buf));
     }
 
@@ -191,7 +185,7 @@ return code;
         let expected = "content1\ncontent2\ncontent3";
 
         let mut buf = Vec::new();
-        comment_strip(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
+        content_stripped(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
         assert_eq!(expected, String::from_utf8_lossy(&buf));
     }
 
@@ -203,7 +197,7 @@ return code;
         let expected = "content1\ncontent2\ncontent3\ncontent4";
 
         let mut buf = Vec::new();
-        comment_strip(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
+        content_stripped(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
         assert_eq!(expected, String::from_utf8_lossy(&buf));
     }
 
@@ -213,7 +207,7 @@ return code;
         let expected = "hello world\nanother line\na final line";
 
         let mut buf = Vec::new();
-        comment_strip(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
+        content_stripped(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
         assert_eq!(expected, String::from_utf8_lossy(&buf));
     }
 }

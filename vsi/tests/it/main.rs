@@ -10,6 +10,7 @@ use stable_eyre::eyre::ensure;
 use stable_eyre::{eyre::Context, Result};
 use tokio::sync::Mutex;
 
+use tokio::task::spawn_blocking;
 use vsi::config;
 use vsi::scan::{Artifact, Id, Options, Sink};
 
@@ -25,6 +26,49 @@ async fn dry_run_succeeds() -> Result<()> {
     let parsed = serde_json::from_str::<HashSet<&str>>(&result)?;
     let expected = HashSet::from(["git+foo$bar", "cargo+baz$bam"]);
     assert_eq!(parsed, expected);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn dry_run_fingerprint() -> Result<()> {
+    let dir = runner::clone_vsi_example().await?;
+    let test_file = dir
+        .path()
+        .join("cpp-vsi-demo")
+        .join("example-internal-project")
+        .join("vendor")
+        .join("facebook-folly-6695020")
+        .join("folly")
+        .join("Version.cpp");
+
+    let processed = spawn_blocking(move || fingerprint::process(&test_file)).await??;
+    let expected_raw = r#"/*
+ * Copyright 2016 Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <folly/VersionCheck.h>
+
+namespace folly { namespace detail {
+
+FOLLY_VERSION_CHECK(folly, FOLLY_VERSION)
+
+}}  // namespaces
+"#;
+    assert_eq!(expected_raw, &processed.raw().1);
+    assert!(!processed.detected_as_binary());
 
     Ok(())
 }
