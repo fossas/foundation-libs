@@ -361,15 +361,17 @@ pub fn process_stream<R: BufRead + Send + Seek + 'static>(
 
     let raw = fingerprint::raw(stream)?;
     stream.seek(io::SeekFrom::Start(0))?;
+
     let mut raw_content = Vec::new();
     if is_binary {
         fingerprint::content_binary(stream, &mut raw_content)?;
     } else {
         fingerprint::content_text(stream, &mut raw_content)?;
     }
-
     stream.seek(io::SeekFrom::Start(0))?;
+
     let comment_stripped = fingerprint::comment_stripped(stream)?;
+    stream.seek(io::SeekFrom::Start(0))?;
 
     Ok(Processed {
         detected_as_binary: is_binary,

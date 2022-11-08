@@ -43,32 +43,26 @@ async fn dry_run_fingerprint() -> Result<()> {
         .join("Version.cpp");
 
     let processed = spawn_blocking(move || fingerprint::process(&test_file)).await??;
-    let expected_raw = r#"/*
- * Copyright 2016 Facebook, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+    let expected_raw = include_str!("testdata/facebook-folly-Version.cpp");
+    let expected_stripped = include_str!("testdata/facebook-folly-Version.cpp.stripped");
 
-#include <folly/VersionCheck.h>
+    let (fp_raw, processed_raw) = processed.raw().to_owned();
+    let Some((fp_stripped, processed_stripped)) = processed.comment_stripped().to_owned() else { panic!("must have comment stripped") };
 
-namespace folly { namespace detail {
-
-FOLLY_VERSION_CHECK(folly, FOLLY_VERSION)
-
-}}  // namespaces
-"#;
-    assert_eq!(expected_raw, &processed.raw().1);
+    // Assert contents were processed correctly.
     assert!(!processed.detected_as_binary());
+    assert_eq!(expected_raw, &processed_raw);
+    assert_eq!(expected_stripped, &processed_stripped);
+
+    // Assert contents match the hash independent of platform.
+    assert_eq!(
+        "bbf596033f085da3c611fc033831204614532a4886083fd55db6307b92cf3acf",
+        fp_raw.to_string()
+    );
+    assert_eq!(
+        "1be79d2f8da94394d7571fbeb9dd01dae39e1e33d57fb24e685622982ba58e0b",
+        fp_stripped.to_string()
+    );
 
     Ok(())
 }

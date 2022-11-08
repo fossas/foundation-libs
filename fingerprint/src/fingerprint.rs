@@ -210,4 +210,15 @@ return code;
         content_stripped(&mut Cursor::new(content), &mut buf).expect("must fingerprint");
         assert_eq!(expected, String::from_utf8_lossy(&buf));
     }
+
+    #[test]
+    fn comment_strip_real_source() {
+        let content = include_bytes!("../testdata/facebook-folly-Version.cpp");
+        let expected = include_str!("../testdata/facebook-folly-Version.cpp.stripped");
+
+        let mut buf = Vec::new();
+        content_stripped(&mut Cursor::new(content), &mut buf).expect("must process");
+
+        assert_eq!(expected, String::from_utf8_lossy(&buf));
+    }
 }
