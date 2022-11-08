@@ -1,0 +1,4 @@
+[profile.default]
+# The integration test for VSI can take a while depending on system load.
+# Try it twice, then mark the test failed.
+slow-timeout = { period = "5m", terminate-after = 2 }
