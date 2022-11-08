@@ -219,6 +219,12 @@ return code;
         let mut buf = Vec::new();
         content_stripped(&mut Cursor::new(content), &mut buf).expect("must process");
 
-        assert_eq!(expected, String::from_utf8_lossy(&buf));
+        assert_eq!(normalize_lf(expected), String::from_utf8_lossy(&buf));
+    }
+
+    /// Windows CI checks out CRLF. Normalize it to be LF only.
+    /// This function should only be applied to testing values, not responses from the functions being tested.
+    fn normalize_lf(input: impl Into<String>) -> String {
+        input.into().replace("\r\n", "\n")
     }
 }

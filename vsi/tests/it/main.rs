@@ -51,8 +51,8 @@ async fn dry_run_fingerprint() -> Result<()> {
 
     // Assert contents were processed correctly.
     assert!(!processed.detected_as_binary());
-    assert_eq!(expected_raw, &processed_raw);
-    assert_eq!(expected_stripped, &processed_stripped);
+    assert_eq!(normalize_lf(expected_raw), processed_raw);
+    assert_eq!(normalize_lf(expected_stripped), processed_stripped);
 
     // Assert contents match the hash independent of platform.
     assert_eq!(
@@ -166,4 +166,10 @@ async fn archive_scan_produces_correct_prints() -> Result<()> {
     assert_eq!(b_actual, Some(b_expected), "comparing b.txt");
 
     Ok(())
+}
+
+/// Windows CI checks out CRLF. Normalize it to be LF only.
+/// This function should only be applied to testing values, not responses from the functions being tested.
+fn normalize_lf(input: impl Into<String>) -> String {
+    input.into().replace("\r\n", "\n")
 }
