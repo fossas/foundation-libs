@@ -60,11 +60,18 @@ jobs:
         vcpkg integrate install
         vcpkg install libarchive:x64-windows-static
 
+    # Set tagged version in Cargo.toml
+    - if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
+      run: |
+        export VERSION=${GITHUB_REF/refs\/tags\/vsi-/}
+        sed -i "s/version = \"0.0.0\"/version = \"$VERSION\"/" Cargo.toml
+
     # Test
     - if: ${{ !contains(matrix.os, 'windows') }}
       run: |
         cargo check --release --all --bins --examples --tests
         cargo nextest run
+        cargo build --release
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
         FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
@@ -73,6 +80,7 @@ jobs:
       run: |
         cargo check --release --all --bins --examples --tests
         cargo nextest run
+        cargo build --release
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
         FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
@@ -81,26 +89,14 @@ jobs:
         VCPKGRS_DYNAMIC: 0
         VCPKG_DEFAULT_TRIPLET: x64-windows-static
 
-    # Set tagged version in Cargo.toml
-    - if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
-      run: |
-        export VERSION=${GITHUB_REF/refs\/tags\/vsi-/}
-        sed -i "s/version = \"0.0.0\"/version = \"$VERSION\"/" Cargo.toml
-
     # Build, store output
-    - if: ${{ !startsWith(github.ref, 'refs/tags/vsi-') }}
-      run: |
-        cargo build --release
+    - run: |
         mkdir release
-        find target/release -type f ! -name "*.*" -maxdepth 1 -exec sh -c 'for f do echo cp "$f" release/$(basename -- "$f")-${ matrix.os-name }; done' sh {} \;
-        find target/release -type f -name "*.exe" -maxdepth 1 -exec sh -c 'for f do echo cp "$f" release/$(basename -- "$f" .exe)-${ matrix.os-name }.exe; done' sh {} \;
-    - if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
-      run: |
-        cargo build --release --bin vsi
-        mkdir release
-        cp target/release/vsi release/vsi-${ matrix.os-name } || true
-        cp target/release/vsi.exe release/vsi-${ matrix.os-name }.exe || true
+        find target/release -type f ! -name "*.*" -maxdepth 1 -exec sh -c 'for f do cp "$f" release/$(basename -- "$f")-$OS_NAME; done' sh {} \;
+        find target/release -type f -name "*.exe" -maxdepth 1 -exec sh -c 'for f do cp "$f" release/$(basename -- "$f" .exe)-$OS_NAME.exe; done' sh {} \;
         strip release/*
+      env:
+        OS_NAME: ${{ matrix.os-name }}
     - uses: actions/upload-artifact@v2
       with:
         name: ${{ runner.os }}-assets
