@@ -37,8 +37,32 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
 
+    # Install system dependencies
+    - if: ${{ contains(matrix.os, 'ubuntu') }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libarchive-dev build-essential nettle-dev libacl1-dev libbz2-dev liblzma-dev liblz4-dev libzstd-dev lzop zlib1g-dev
+    - if: ${{ contains(matrix.os, 'macos') }}
+      run: |
+        brew install pkgconfig libarchive
+        echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||') >> $GITHUB_ENV
+    - if: ${{ contains(matrix.os, 'windows') }}
+      uses: actions/cache@v3
+        with:
+          path: C:/Users/runneradmin/AppData/Local/vcpkg/archives
+          key: ${{ runner.os }}-vcpkg-cache-x64-windows-static
+    - if: ${{ contains(matrix.os, 'windows') }}
+      run: |
+        vcpkg integrate install
+        vcpkg install libarchive:x64-windows-static
+
     # Test
+    - run: cargo check --release --all --bins --examples --tests
     - run: cargo nextest run
+      env:
+        FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
+        ENABLE_NETWORK_TESTS: "1"
 
     # Set tagged version in Cargo.toml
     - run: echo "VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_OUTPUT

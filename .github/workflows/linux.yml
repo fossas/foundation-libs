@@ -1,6 +1,6 @@
 name: linux
 
-on: pull_request
+on:
 
 jobs:
   build-and-test:
