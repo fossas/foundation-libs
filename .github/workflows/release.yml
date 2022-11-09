@@ -69,8 +69,10 @@ jobs:
         ENABLE_NETWORK_TESTS: "1"
 
     # Set tagged version in Cargo.toml
-    - run: echo "VERSION=${GITHUB_REF/refs\/tags\/vsi-/}" >> $GITHUB_OUTPUT
-    - run: sed -i "s/version = \"0.0.0\"/version = \"$GIT_VERSION\"/" Cargo.toml
+    - if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
+      run: |
+        export VERSION=${GITHUB_REF/refs\/tags\/vsi-/}
+        sed -i "s/version = \"0.0.0\"/version = \"$VERSION\"/" Cargo.toml
 
     # Build, store output
     - if: ${{ !startsWith(github.ref, 'refs/tags/vsi-') }}

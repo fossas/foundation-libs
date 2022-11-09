@@ -1,6 +1,6 @@
 [package]
 name = "vsi"
-version = "1.0.1"
+version = "0.0.0"
 edition = "2021"
 description = "The canonical client for running VSI scans"
 
