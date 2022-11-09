@@ -11,7 +11,10 @@
 //!
 //! Only then can the client know which dependencies were discovered for the scan artifacts by the forensics service.
 
-use std::{fmt::Display, path::PathBuf};
+use std::{
+    fmt::Display,
+    path::{self, PathBuf},
+};
 
 use async_trait::async_trait;
 use defer_lite::defer;
@@ -68,6 +71,17 @@ impl Display for Artifact {
 }
 
 impl Artifact {
+    /// Normalize the artifact's path to use unix-style path separators.
+    pub fn normalize(self) -> Self {
+        if path::MAIN_SEPARATOR == '/' {
+            return self;
+        }
+
+        let (path, fp) = self.explode_string();
+        let path = PathBuf::from(path.replace(path::MAIN_SEPARATOR, "/"));
+        Artifact(path, fp)
+    }
+
     /// Explode the artifact into its constituent tuple.
     pub fn explode(self) -> (PathBuf, fingerprint::Combined) {
         (self.0, self.1)
@@ -163,4 +177,19 @@ async fn upload<S: Sink>(client: &S, id: &Id, mut rx: Receiver<Artifact>) -> Res
     }
 
     Ok(uploaded)
+}
+
+#[cfg(test)]
+mod tests {
+    use fingerprint::Combined;
+
+    use super::*;
+
+    #[test]
+    fn artifact_path_normalized() {
+        let path = PathBuf::new().join("foo").join("bar").join("baz");
+        let artifact = Artifact(path, Combined::default());
+        let (normalized_path, _) = artifact.normalize().explode_string();
+        assert_eq!("foo/bar/baz", normalized_path);
+    }
 }

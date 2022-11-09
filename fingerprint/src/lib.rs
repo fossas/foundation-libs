@@ -25,6 +25,7 @@ use std::{
     path::Path,
 };
 
+use fingerprint::BinaryCheck;
 use getset::Getters;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -96,7 +97,7 @@ pub trait Kind: private::Sealed {}
 /// hypothetical future fingerprint kinds such as something based on an AST would require that the file is source code.
 ///
 /// This fingerprint kind has been finalized and may not change (except to fix a bug).
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct RawSHA256;
 
 impl private::Sealed for RawSHA256 {}
@@ -112,7 +113,7 @@ impl Display for RawSHA256 {
 /// after performing basic C-style comment stripping.
 ///
 /// This fingerprint kind has been finalized and may not change (except to fix a bug).
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct CommentStrippedSHA256;
 
 impl private::Sealed for CommentStrippedSHA256 {}
@@ -253,7 +254,7 @@ where
 ///
 /// For example, this means that if [`Combined`] is created over a binary file, [`CommentStrippedSHA256`] is not
 /// in the resulting data structure, because that kind of fingerprint requires UTF8 encoded text content to run.
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Getters, Serialize, Deserialize)]
+#[derive(Clone, Hash, Eq, PartialEq, Default, Debug, Getters, Serialize, Deserialize)]
 #[cfg_attr(test, derive(TypedBuilder))]
 #[getset(get = "pub")]
 pub struct Combined {
@@ -314,6 +315,79 @@ pub fn fingerprint_stream<R: BufRead + Send + Seek + 'static>(
         raw,
         comment_stripped,
     })
+}
+
+/// The result of eagerly running all fingerprint [`Kind`]s on some given content.
+///
+/// This structure is equivalent to [`Combined`], but each fingerprint is a tuple of the computed fingerprint
+/// plus the content that was processed to make the fingerprint.
+#[derive(Clone, Hash, Eq, PartialEq, Debug, Getters, Serialize, Deserialize)]
+#[getset(get = "pub")]
+pub struct Processed {
+    /// Whether the file was detected to be binary.
+    detected_as_binary: bool,
+
+    /// This fingerprint is derived regardless of the kind of file.
+    raw: (Fingerprint<RawSHA256>, String),
+
+    /// The fingerprint derived when the file is a text file, and any C-style comments have been removed.
+    comment_stripped: Option<(Fingerprint<CommentStrippedSHA256>, String)>,
+}
+
+/// Process the provided file with all fingerprint [`Kind`]s.
+///
+/// # Performance
+///
+/// This function is intended to be used for debugging;
+/// it outputs much more data and is much more expensive in terms of IO
+/// as compared to the standard fingerprint functions.
+pub fn process(path: &Path) -> Result<Processed, Error> {
+    let mut file = BufReader::new(File::open(path)?);
+    process_stream(&mut file)
+}
+
+/// Process the provided stream (typically a file handle) with all fingerprint [`Kind`]s.
+///
+/// # Performance
+///
+/// This function is intended to be used for debugging;
+/// it outputs much more data and is much more expensive in terms of IO
+/// as compared to the standard fingerprint functions.
+pub fn process_stream<R: BufRead + Send + Seek + 'static>(
+    stream: &mut R,
+) -> Result<Processed, Error> {
+    let BinaryCheck { is_binary, .. } = fingerprint::content_is_binary(stream)?;
+    stream.seek(io::SeekFrom::Start(0))?;
+
+    let raw = fingerprint::raw(stream)?;
+    stream.seek(io::SeekFrom::Start(0))?;
+
+    let mut raw_content = Vec::new();
+    if is_binary {
+        fingerprint::content_binary(stream, &mut raw_content)?;
+    } else {
+        fingerprint::content_text(stream, &mut raw_content)?;
+    }
+    stream.seek(io::SeekFrom::Start(0))?;
+
+    let comment_stripped = fingerprint::comment_stripped(stream)?;
+    stream.seek(io::SeekFrom::Start(0))?;
+
+    Ok(Processed {
+        detected_as_binary: is_binary,
+        raw: (raw, lossy_string(raw_content)),
+        comment_stripped: if let Some(comment_stripped) = comment_stripped {
+            let mut stripped_content = Vec::new();
+            fingerprint::content_stripped(stream, &mut stripped_content)?;
+            Some((comment_stripped, lossy_string(stripped_content)))
+        } else {
+            None
+        },
+    })
+}
+
+fn lossy_string(v: Vec<u8>) -> String {
+    String::from_utf8_lossy(&v).to_string()
 }
 
 #[cfg(test)]

@@ -50,7 +50,7 @@ pub struct Api {
     /// The FOSSA organization to which the scan belongs.
     ///
     /// This is not important from a security perspective; it's meant to be used for statistical purposes.
-    #[clap(long, default_value_t = 1)]
+    #[clap(long, default_value_t = 1, env = "FOSSA_ORG_ID")]
     #[getset(get_copy = "pub")]
     organization_id: usize,
 }

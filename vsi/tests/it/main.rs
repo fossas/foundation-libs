@@ -10,6 +10,7 @@ use stable_eyre::eyre::ensure;
 use stable_eyre::{eyre::Context, Result};
 use tokio::sync::Mutex;
 
+use tokio::task::spawn_blocking;
 use vsi::config;
 use vsi::scan::{Artifact, Id, Options, Sink};
 
@@ -25,6 +26,43 @@ async fn dry_run_succeeds() -> Result<()> {
     let parsed = serde_json::from_str::<HashSet<&str>>(&result)?;
     let expected = HashSet::from(["git+foo$bar", "cargo+baz$bam"]);
     assert_eq!(parsed, expected);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn dry_run_fingerprint() -> Result<()> {
+    let dir = runner::clone_vsi_example().await?;
+    let test_file = dir
+        .path()
+        .join("cpp-vsi-demo")
+        .join("example-internal-project")
+        .join("vendor")
+        .join("facebook-folly-6695020")
+        .join("folly")
+        .join("Version.cpp");
+
+    let processed = spawn_blocking(move || fingerprint::process(&test_file)).await??;
+    let expected_raw = include_str!("testdata/facebook-folly-Version.cpp");
+    let expected_stripped = include_str!("testdata/facebook-folly-Version.cpp.stripped");
+
+    let (fp_raw, processed_raw) = processed.raw().to_owned();
+    let Some((fp_stripped, processed_stripped)) = processed.comment_stripped().to_owned() else { panic!("must have comment stripped") };
+
+    // Assert contents were processed correctly.
+    assert!(!processed.detected_as_binary());
+    assert_eq!(normalize_lf(expected_raw), processed_raw);
+    assert_eq!(normalize_lf(expected_stripped), processed_stripped);
+
+    // Assert contents match the hash independent of platform.
+    assert_eq!(
+        "bbf596033f085da3c611fc033831204614532a4886083fd55db6307b92cf3acf",
+        fp_raw.to_string()
+    );
+    assert_eq!(
+        "1be79d2f8da94394d7571fbeb9dd01dae39e1e33d57fb24e685622982ba58e0b",
+        fp_stripped.to_string()
+    );
 
     Ok(())
 }
@@ -128,4 +166,10 @@ async fn archive_scan_produces_correct_prints() -> Result<()> {
     assert_eq!(b_actual, Some(b_expected), "comparing b.txt");
 
     Ok(())
+}
+
+/// Windows CI checks out CRLF. Normalize it to be LF only.
+/// This function should only be applied to testing values, not responses from the functions being tested.
+fn normalize_lf(input: impl Into<String>) -> String {
+    input.into().replace("\r\n", "\n")
 }

@@ -109,7 +109,7 @@ impl List {
     ) -> Result<Vec<Attempt>, Error> {
         debug!("expanding layer at {dir:?}");
         let mut stack = Vec::new();
-        let walker = WalkDir::new(&dir)
+        let walker = WalkDir::new(dir)
             .follow_links(false)
             .into_iter()
             .filter_entry(|e| {
