@@ -97,7 +97,7 @@ pub trait Kind: private::Sealed {}
 /// hypothetical future fingerprint kinds such as something based on an AST would require that the file is source code.
 ///
 /// This fingerprint kind has been finalized and may not change (except to fix a bug).
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct RawSHA256;
 
 impl private::Sealed for RawSHA256 {}
@@ -113,7 +113,7 @@ impl Display for RawSHA256 {
 /// after performing basic C-style comment stripping.
 ///
 /// This fingerprint kind has been finalized and may not change (except to fix a bug).
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct CommentStrippedSHA256;
 
 impl private::Sealed for CommentStrippedSHA256 {}
@@ -254,7 +254,7 @@ where
 ///
 /// For example, this means that if [`Combined`] is created over a binary file, [`CommentStrippedSHA256`] is not
 /// in the resulting data structure, because that kind of fingerprint requires UTF8 encoded text content to run.
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Getters, Serialize, Deserialize)]
+#[derive(Clone, Hash, Eq, PartialEq, Default, Debug, Getters, Serialize, Deserialize)]
 #[cfg_attr(test, derive(TypedBuilder))]
 #[getset(get = "pub")]
 pub struct Combined {
