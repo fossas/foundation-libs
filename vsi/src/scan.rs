@@ -178,3 +178,18 @@ async fn upload<S: Sink>(client: &S, id: &Id, mut rx: Receiver<Artifact>) -> Res
 
     Ok(uploaded)
 }
+
+#[cfg(test)]
+mod tests {
+    use fingerprint::Combined;
+
+    use super::*;
+
+    #[test]
+    fn artifact_path_normalized() {
+        let path = PathBuf::new().join("foo").join("bar").join("baz");
+        let artifact = Artifact(path, Combined::default());
+        let (normalized_path, _) = artifact.normalize().explode_string();
+        assert_eq!("foo/bar/baz", normalized_path);
+    }
+}
