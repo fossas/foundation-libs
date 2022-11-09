@@ -61,12 +61,25 @@ jobs:
         vcpkg install libarchive:x64-windows-static
 
     # Test
-    - run: cargo check --release --all --bins --examples --tests
-    - run: cargo nextest run
+    - if: ${{ !contains(matrix.os, 'windows') }}
+      run: |
+        cargo check --release --all --bins --examples --tests
+        cargo nextest run
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
         FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
         ENABLE_NETWORK_TESTS: "1"
+    - if: ${{ contains(matrix.os, 'windows') }}
+      run: |
+        cargo check --release --all --bins --examples --tests
+        cargo nextest run
+      env:
+        FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
+        ENABLE_NETWORK_TESTS: "1"
+        RUSTFLAGS: -C target-feature=+crt-static
+        VCPKGRS_DYNAMIC: 0
+        VCPKG_DEFAULT_TRIPLET: x64-windows-static
 
     # Set tagged version in Cargo.toml
     - if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
