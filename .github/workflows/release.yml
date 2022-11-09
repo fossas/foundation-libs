@@ -66,7 +66,7 @@ jobs:
         export VERSION=${GITHUB_REF/refs\/tags\/vsi-/}
         sed -i "s/version = \"0.0.0\"/version = \"$VERSION\"/" Cargo.toml
 
-    # Test
+    # Test and run the build
     - if: ${{ !contains(matrix.os, 'windows') }}
       run: |
         cargo check --release --all --bins --examples --tests
@@ -74,7 +74,6 @@ jobs:
         cargo build --release
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-        FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
         ENABLE_NETWORK_TESTS: "1"
     - if: ${{ contains(matrix.os, 'windows') }}
       run: |
@@ -83,13 +82,12 @@ jobs:
         cargo build --release
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-        FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
         ENABLE_NETWORK_TESTS: "1"
         RUSTFLAGS: -C target-feature=+crt-static
         VCPKGRS_DYNAMIC: 0
         VCPKG_DEFAULT_TRIPLET: x64-windows-static
 
-    # Build, store output
+    # Store release assets
     - run: |
         mkdir release
         find target/release -type f ! -name "*.*" -maxdepth 1 -exec sh -c 'for f do cp "$f" release/$(basename -- "$f")-$OS_NAME; done' sh {} \;
@@ -99,7 +97,7 @@ jobs:
         OS_NAME: ${{ matrix.os-name }}
     - uses: actions/upload-artifact@v2
       with:
-        name: ${{ runner.os }}-assets
+        name: ${{ matrix.os-name }}-assets
         path: release
 
   create-release:
