@@ -13,7 +13,6 @@ jobs:
   build-and-test:
     name: ${{ matrix.os-name }} build
     runs-on: ${{ matrix.os }}
-    container: ghcr.io/jssblck/rust-ci
 
     defaults:
       run:
@@ -36,6 +35,11 @@ jobs:
     # Check out the repo
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: taiki-e/install-action@nextest
 
     # Install system dependencies
     - if: ${{ contains(matrix.os, 'ubuntu') }}
