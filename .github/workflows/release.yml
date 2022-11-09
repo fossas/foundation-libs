@@ -1,4 +1,4 @@
-name: release vsi
+name: release
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   build-and-test:
-    name: ${{ matrix.os-name }} build
+    name: build-and-test-${{ matrix.os-name }}
     runs-on: ${{ matrix.os }}
 
     defaults:
