@@ -161,7 +161,7 @@ impl super::Client for Fossa {
             .join(&format!("{id}/"))?
             .join("files")?;
 
-        let scan_data = HashMap::from_iter(artifacts.into_iter().map(|a| a.explode()));
+        let scan_data = HashMap::from_iter(artifacts.into_iter().map(|a| a.normalize().explode()));
         let req_body = ReqBody { scan_data };
         let req = self
             .client
