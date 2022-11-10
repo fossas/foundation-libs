@@ -1,0 +1,123 @@
+name: release
+
+on:
+  pull_request:
+  push: 
+    tags:
+      - 'vsi-[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    name: build-and-test-${{ matrix.os-name }}
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      matrix:
+        os: ['windows-latest', 'ubuntu-latest', 'macos-latest']
+        include:
+          - os: ubuntu-latest
+            os-name: linux
+
+          - os: macos-latest
+            os-name: macos
+
+          - os: windows-latest
+            os-name: windows
+
+    steps:
+    # Check out the repo
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: taiki-e/install-action@nextest
+
+    # Install system dependencies
+    - if: ${{ contains(matrix.os, 'ubuntu') }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libarchive-dev build-essential nettle-dev libacl1-dev libbz2-dev liblzma-dev liblz4-dev libzstd-dev lzop zlib1g-dev
+    - if: ${{ contains(matrix.os, 'macos') }}
+      run: |
+        brew install pkgconfig libarchive
+        echo PKG_CONFIG_PATH=$(brew ls libarchive | grep .pc$ | sed 's|/libarchive.pc||') >> $GITHUB_ENV
+    - if: ${{ contains(matrix.os, 'windows') }}
+      uses: actions/cache@v3
+      with:
+        path: C:/Users/runneradmin/AppData/Local/vcpkg/archives
+        key: ${{ runner.os }}-vcpkg-cache-x64-windows-static
+    - if: ${{ contains(matrix.os, 'windows') }}
+      run: |
+        vcpkg integrate install
+        vcpkg install libarchive:x64-windows-static
+
+    # Set tagged version in Cargo.toml
+    - if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
+      run: |
+        export VERSION=${GITHUB_REF/refs\/tags\/vsi-/}
+        sed -i "s/version = \"0.0.0\"/version = \"$VERSION\"/" Cargo.toml
+
+    # Test and run the build
+    - if: ${{ !contains(matrix.os, 'windows') }}
+      run: |
+        cargo check --release --all --bins --examples --tests
+        cargo nextest run
+        cargo build --release
+      env:
+        FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        FOSSA_ORG_ID: "1"
+        ENABLE_NETWORK_TESTS: "1"
+    - if: ${{ contains(matrix.os, 'windows') }}
+      run: |
+        cargo check --release --all --bins --examples --tests
+        cargo nextest run
+        cargo build --release
+      env:
+        FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        FOSSA_ORG_ID: "1"
+        ENABLE_NETWORK_TESTS: "1"
+        RUSTFLAGS: -C target-feature=+crt-static
+        VCPKGRS_DYNAMIC: 0
+        VCPKG_DEFAULT_TRIPLET: x64-windows-static
+
+    # Store release assets
+    - run: |
+        mkdir release
+        find target/release -type f ! -name "*.*" -maxdepth 1 -exec sh -c 'for f do cp "$f" release/$(basename -- "$f")-$OS_NAME; done' sh {} \;
+        find target/release -type f -name "*.exe" -maxdepth 1 -exec sh -c 'for f do cp "$f" release/$(basename -- "$f" .exe)-$OS_NAME.exe; done' sh {} \;
+        strip release/*
+      env:
+        OS_NAME: ${{ matrix.os-name }}
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os-name }}-assets
+        path: release
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: ['build-and-test']
+    if: ${{ startsWith(github.ref, 'refs/tags/vsi-') }}
+
+    steps:
+    # Download and prep built artifacts for release
+    - uses: actions/download-artifact@v2
+    
+    # Upload built artifacts to the release
+    #
+    # This creates the release as a draft;
+    # it needs to have its changelog updated and marked as non-draft to complete the release.
+    - uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+        draft: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
