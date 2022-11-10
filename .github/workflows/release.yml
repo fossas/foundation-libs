@@ -74,6 +74,7 @@ jobs:
         cargo build --release
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        FOSSA_ORG_ID: "1"
         ENABLE_NETWORK_TESTS: "1"
     - if: ${{ contains(matrix.os, 'windows') }}
       run: |
@@ -82,6 +83,7 @@ jobs:
         cargo build --release
       env:
         FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+        FOSSA_ORG_ID: "1"
         ENABLE_NETWORK_TESTS: "1"
         RUSTFLAGS: -C target-feature=+crt-static
         VCPKGRS_DYNAMIC: 0
