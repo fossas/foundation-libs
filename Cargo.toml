@@ -4,6 +4,7 @@ members = [
   "berkeleydb",
   "fingerprint",
   "vsi",
+  "srclib",
 ]
 
 [profile.dev.package.backtrace]
