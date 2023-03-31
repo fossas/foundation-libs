@@ -101,6 +101,54 @@ fn parse_with_org() {
     }
 }
 
+#[test]
+fn render_with_org() {
+    let locator = Locator::builder()
+        .fetcher(Fetcher::Custom)
+        .org_id(1234)
+        .project("foo/bar")
+        .revision("123abc")
+        .build();
+
+    let rendered = locator.to_string();
+    assert_eq!("custom+1234/foo/bar$123abc", rendered);
+
+    let package_only = locator.into_package();
+    let rendered = package_only.to_string();
+    assert_eq!("custom+1234/foo/bar", rendered);
+}
+
+#[test]
+fn render_with_revision() {
+    let locator = Locator::builder()
+        .fetcher(Fetcher::Custom)
+        .project("foo/bar")
+        .revision("123abc")
+        .build();
+
+    let rendered = locator.to_string();
+    assert_eq!("custom+foo/bar$123abc", rendered);
+
+    let package_only = locator.into_package();
+    let rendered = package_only.to_string();
+    assert_eq!("custom+foo/bar", rendered);
+}
+
+#[test]
+fn render_project() {
+    let locator = Locator::builder()
+        .fetcher(Fetcher::Custom)
+        .project("foo/bar")
+        .build();
+
+    let rendered = locator.to_string();
+    assert_eq!("custom+foo/bar", rendered);
+
+    let package_only = locator.into_package();
+    let rendered = package_only.to_string();
+    assert_eq!("custom+foo/bar", rendered);
+}
+
 /// Regular expression that matches any unicode string that is:
 /// - Prefixed with `git+`
 /// - Contains at least one character that is not a control character and not the literal `$`
