@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use getset::{CopyGetters, Getters};
 use lazy_static::lazy_static;
@@ -84,9 +84,7 @@ pub enum ParseError {
 ///
 /// For more information on the background of `Locator` and fetchers generally,
 /// refer to [Fetchers and Locators](https://go/fetchers-doc).
-#[derive(
-    Clone, Eq, PartialEq, Hash, Debug, TypedBuilder, Deserialize, Serialize, Getters, CopyGetters,
-)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, TypedBuilder, Getters, CopyGetters)]
 pub struct Locator {
     /// Determines which fetcher is used to download this project.
     #[getset(get_copy = "pub")]
@@ -223,11 +221,30 @@ impl Display for Locator {
     }
 }
 
+impl<'de> Deserialize<'de> for Locator {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        Locator::parse(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for Locator {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
 /// A [`Locator`] specialized to not include the `revision` component.
 ///
 /// Any [`Locator`] may be converted to a `PackageLocator` by simply discarding the `revision` component.
 /// To create a [`Locator`] from a `PackageLocator`, the value for `revision` must be provided; see [`Locator`] for details.
-#[derive(Clone, Eq, PartialEq, Hash, Debug, TypedBuilder, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, TypedBuilder)]
 pub struct PackageLocator {
     /// Determines which fetcher is used to download this dependency
     /// from the internet.
@@ -290,6 +307,25 @@ impl Display for PackageLocator {
     }
 }
 
+impl<'de> Deserialize<'de> for PackageLocator {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        PackageLocator::parse(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for PackageLocator {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
 /// [`Locator`] is closely tied with the concept of Core's "fetchers",
 /// which are asynchronous jobs tasked with downloading the code
 /// referred to by a [`Locator`] so that Core or some other service
@@ -306,20 +342,7 @@ impl Display for PackageLocator {
 ///
 /// For more information on the background of `Locator` and fetchers generally,
 /// refer to [Fetchers and Locators](https://go/fetchers-doc).
-#[derive(
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Hash,
-    Debug,
-    Display,
-    EnumString,
-    EnumIter,
-    AsRefStr,
-    Deserialize,
-    Serialize,
-)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display, EnumString, EnumIter, AsRefStr)]
 #[non_exhaustive]
 pub enum Fetcher {
     /// The `git` fetcher handles interaction with git vcs hosts.
@@ -332,6 +355,25 @@ pub enum Fetcher {
     /// this way in order to cooperate with the `Locator` shape.
     #[strum(serialize = "custom")]
     Custom,
+}
+
+impl<'de> Deserialize<'de> for Fetcher {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        Fetcher::from_str(&raw).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for Fetcher {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
 }
 
 impl From<Locator> for PackageLocator {

@@ -1,6 +1,7 @@
 use assert_matches::assert_matches;
 use itertools::izip;
 use proptest::prelude::*;
+use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use super::*;
@@ -147,6 +148,40 @@ fn render_project() {
     let package_only = locator.into_package();
     let rendered = package_only.to_string();
     assert_eq!("custom+foo/bar", rendered);
+}
+
+#[test]
+fn roundtrip_serialization() {
+    let input = Locator::builder()
+        .fetcher(Fetcher::Custom)
+        .project("foo")
+        .revision("bar")
+        .org_id(1)
+        .build();
+
+    let serialized = serde_json::to_string(&input).expect("must serialize");
+    let deserialized = serde_json::from_str(&serialized).expect("must deserialize");
+    assert_eq!(input, deserialized);
+}
+
+#[test]
+fn serde_deserialization() {
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Test {
+        locator: Locator,
+    }
+
+    let input = r#"{ "locator": "custom+1/foo$bar" }"#;
+    let expected = Locator::builder()
+        .fetcher(Fetcher::Custom)
+        .project("foo")
+        .revision("bar")
+        .org_id(1)
+        .build();
+    let expected = Test { locator: expected };
+
+    let deserialized = serde_json::from_str(input).expect("must deserialize");
+    assert_eq!(expected, deserialized, "deserialize {input}");
 }
 
 /// Regular expression that matches any unicode string that is:
