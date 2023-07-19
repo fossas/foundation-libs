@@ -83,7 +83,8 @@ pub enum ParseError {
 /// accessible is to run it through the Core fetcher system.
 ///
 /// For more information on the background of `Locator` and fetchers generally,
-/// refer to [Fetchers and Locators](https://go/fetchers-doc).
+/// FOSSA employees may refer to
+/// [Fetchers and Locators](https://go/fetchers-doc).
 #[derive(Clone, Eq, PartialEq, Hash, Debug, TypedBuilder, Getters, CopyGetters)]
 pub struct Locator {
     /// Determines which fetcher is used to download this project.
