@@ -51,9 +51,10 @@ Options:
       --trace-colors <TRACE_COLORS>
           The coloring mode to use for log and span traces
           
-          [default: enable]
+          [default: auto]
 
           Possible values:
+          - auto:    Choose to output text with coloring or not by checking for whether stderr is an interactive terminal session
           - enable:  Output text with coloring
           - disable: Output text without coloring
 

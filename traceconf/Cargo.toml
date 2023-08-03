@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+atty = "0.2.14"
 clap = { version = "4.3.19", features = ["derive"] }
 getset = "0.1.2"
 strum = { version = "0.25.0", features = ["derive"] }

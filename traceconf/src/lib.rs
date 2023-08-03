@@ -207,10 +207,16 @@ impl TracingConfig {
             }
         };
 
+        let colors_enabled = match self.trace_colors {
+            Colors::Auto => atty::is(atty::Stream::Stderr),
+            Colors::Enable => true,
+            Colors::Disable => false,
+        };
+
         Registry::default()
             .with(
                 tracing_subscriber::fmt::layer()
-                    .with_ansi(self.trace_colors == Colors::Enable)
+                    .with_ansi(colors_enabled)
                     .with_writer(move || writer_for(Format::Text))
                     .with_file(false)
                     .with_line_number(false)
@@ -220,7 +226,7 @@ impl TracingConfig {
             .with(
                 tracing_subscriber::fmt::layer()
                     .json()
-                    .with_ansi(self.trace_colors == Colors::Enable)
+                    .with_ansi(colors_enabled)
                     .with_writer(move || writer_for(Format::Json))
                     .with_span_events(self.fmt_span())
                     .with_filter(self.level_filter()),
@@ -249,6 +255,11 @@ impl Default for Format {
 /// The terminal color modes to use.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
 pub enum Colors {
+    /// Choose to output text with coloring or not by checking
+    /// for whether stderr is an interactive terminal session.
+    #[strum(serialize = "auto")]
+    Auto,
+
     /// Output text with coloring.
     #[strum(serialize = "enable")]
     Enable,
@@ -260,7 +271,7 @@ pub enum Colors {
 
 impl Default for Colors {
     fn default() -> Self {
-        Self::Enable
+        Self::Auto
     }
 }
 

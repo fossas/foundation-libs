@@ -107,7 +107,7 @@ fn debug_output_format_text_colors() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
         (r#"[0-9\-]+T[0-9:]+\.\d{6}Z"#, "{timestamp}"),
-        (r#"=\d+(\.\d+)?µs"#, "={timespan}"),
+        (r#"\d+(\.\d+)?µs"#, "{timespan}"),
     ];
 
     let format = traceconf::Format::Text.to_string();
@@ -121,6 +121,31 @@ fn debug_output_format_text_colors() {
     insta::with_settings!(
         { filters => filters.clone() },
         { assert_snapshot!(output); });
+}
+
+#[test]
+fn debug_output_format_json_colors() {
+    let sh = Shell::new().expect("create shell");
+    let filters = vec![
+        (r#"[0-9\-]+T[0-9:]+\.\d{6}Z"#, "<timestamp>"),
+        (r#"\d+(\.\d+)?µs"#, "<timespan>"),
+    ];
+
+    let format = traceconf::Format::Json.to_string();
+    let level = traceconf::Level::Trace.to_string();
+    let spans = traceconf::Span::Full.to_string();
+
+    // JSON format should not output colors ever,
+    // so all the color option output should match.
+    for colors in traceconf::Colors::iter().map(to_string) {
+        let output = cmd!(sh, "cargo run -q --bin traceconf -- debug-output-format --trace-colors {colors} --trace-format {format} --trace-level {level} --trace-spans {spans}")
+                        .read_stderr()
+                        .expect("must have run");
+
+        insta::with_settings!(
+            { filters => filters.clone() },
+            { assert_snapshot!("debug_output_format_json_colors", output); });
+    }
 }
 
 fn to_string<T: ToString>(item: T) -> String {
