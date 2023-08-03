@@ -1,0 +1,30 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+{timestamp}  INFO traceconf::debug_output_format: demonstrating how messages are logged.
+{timestamp}  INFO traceconf::debug_output_format: 
+{timestamp} ERROR traceconf::debug_output_format: message at level 'Error'
+{timestamp}  INFO traceconf::debug_output_format: message at level 'Info'
+{timestamp}  WARN traceconf::debug_output_format: message at level 'Warn'
+{timestamp}  INFO traceconf::debug_output_format: 
+{timestamp}  INFO traceconf::debug_output_format: -------
+{timestamp}  INFO traceconf::debug_output_format: demonstrating how spans are logged.
+{timestamp}  INFO traceconf::debug_output_format: calling 'uppercase' with the argument 'hello', then logging the result:
+{timestamp}  INFO traceconf::debug_output_format: 
+{timestamp}  INFO traceconf::debug_output_format: the word 'hello' uppercased is...
+{timestamp}  INFO uppercase{input="hello" uppercased="HELLO"}: traceconf::debug_output_format: exit
+{timestamp}  INFO traceconf::debug_output_format: > 'HELLO'
+{timestamp}  INFO traceconf::debug_output_format: 
+{timestamp}  INFO traceconf::debug_output_format: -------
+{timestamp}  INFO traceconf::debug_output_format: demonstrating how nested spans are logged.
+{timestamp}  INFO traceconf::debug_output_format: calling the function 'inner' with an argument, which will in turn call 'nested_inner' with a different argument.
+{timestamp}  INFO traceconf::debug_output_format: 
+{timestamp} ERROR inner{value="some value passed to 'inner'"}: traceconf::debug_output_format: message at level 'Error' inside function 'inner'
+{timestamp}  INFO inner{value="some value passed to 'inner'"}: traceconf::debug_output_format: message at level 'Info' inside function 'inner'
+{timestamp}  WARN inner{value="some value passed to 'inner'"}: traceconf::debug_output_format: message at level 'Warn' inside function 'inner'
+{timestamp} ERROR inner{value="some value passed to 'inner'"}:nested_inner{value="some value passed to 'nested_inner'"}: traceconf::debug_output_format: message at level 'Error' inside function 'nested_inner_function', called from inside 'inner'
+{timestamp}  INFO inner{value="some value passed to 'inner'"}:nested_inner{value="some value passed to 'nested_inner'"}: traceconf::debug_output_format: message at level 'Info' inside function 'nested_inner_function', called from inside 'inner'
+{timestamp}  WARN inner{value="some value passed to 'inner'"}:nested_inner{value="some value passed to 'nested_inner'"}: traceconf::debug_output_format: message at level 'Warn' inside function 'nested_inner_function', called from inside 'inner'
+{timestamp}  INFO inner{value="some value passed to 'inner'"}:nested_inner{value="some value passed to 'nested_inner'"}: traceconf::debug_output_format: exit
+{timestamp}  INFO inner{value="some value passed to 'inner'"}: traceconf::debug_output_format: exit

@@ -10,3 +10,7 @@ strum = { version = "0.25.0", features = ["derive"] }
 thiserror = "1.0.44"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json"] }
+
+[dev-dependencies]
+insta = { version = "1.30.0", features = ["filters", "json", "yaml"] }
+xshell = "0.2.5"

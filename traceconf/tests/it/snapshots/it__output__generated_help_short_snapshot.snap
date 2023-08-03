@@ -1,0 +1,20 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+Example for how to utilize `traceconf` in another program
+
+Usage: traceconf [OPTIONS] <COMMAND>
+
+Commands:
+  hello                Say hello
+  debug-output-format  Showcase how output is formatted so that users can see what effects formatting arguments have
+  help                 Print this message or the help of the given subcommand(s)
+
+Options:
+      --trace-level <TRACE_LEVEL>    Set the minimum level for logs. Logs below this level are dropped [default: info] [possible values: off, error, warn, info, debug, trace]
+      --trace-spans <TRACE_SPANS>    Enable span traces in logs. Span traces report on units of work performed by the program [default: off] [possible values: off, new, enter, exit, close, active, full]
+      --trace-format <TRACE_FORMAT>  The formatter to use for log and span traces [default: text] [possible values: text, json]
+      --trace-colors <TRACE_COLORS>  The coloring mode to use for log and span traces [default: enable] [possible values: enable, disable]
+  -h, --help                         Print help (see more with '--help')
+  -V, --version                      Print version

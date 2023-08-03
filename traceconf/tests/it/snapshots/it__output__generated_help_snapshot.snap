@@ -1,0 +1,64 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+Example for how to utilize `traceconf` in another program
+
+Usage: traceconf [OPTIONS] <COMMAND>
+
+Commands:
+  hello                Say hello
+  debug-output-format  Showcase how output is formatted so that users can see what effects formatting arguments have
+  help                 Print this message or the help of the given subcommand(s)
+
+Options:
+      --trace-level <TRACE_LEVEL>
+          Set the minimum level for logs. Logs below this level are dropped
+          
+          [default: info]
+
+          Possible values:
+          - off:   Do not emit events
+          - error: Emit events that are 'Error' level or higher
+          - warn:  Emit events that are 'Warn' level or higher
+          - info:  Emit events that are 'Info' level or higher
+          - debug: Emit events that are 'Debug' level or higher
+          - trace: Emit events that are 'Trace' level or higher
+
+      --trace-spans <TRACE_SPANS>
+          Enable span traces in logs. Span traces report on units of work performed by the program
+          
+          [default: off]
+
+          Possible values:
+          - off:    Do not log span traces
+          - new:    One event when the span is created
+          - enter:  One event when the span begins executing
+          - exit:   One event when the span suspends or finishes executing
+          - close:  One event when the span context is dropped after fully executing
+          - active: Combination of 'Enter' and 'Exit' events
+          - full:   Combination of all events
+
+      --trace-format <TRACE_FORMAT>
+          The formatter to use for log and span traces
+          
+          [default: text]
+
+          Possible values:
+          - text: Output text formatted logs and traces for humans
+          - json: Output JSON formatted logs and traces for machines
+
+      --trace-colors <TRACE_COLORS>
+          The coloring mode to use for log and span traces
+          
+          [default: enable]
+
+          Possible values:
+          - enable:  Output text with coloring
+          - disable: Output text without coloring
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version

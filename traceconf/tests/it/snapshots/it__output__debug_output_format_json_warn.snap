@@ -1,0 +1,10 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+{"timestamp":"<timestamp>","level":"ERROR","fields":{"message":"message at level 'Error'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"WARN","fields":{"message":"message at level 'Warn'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"ERROR","fields":{"message":"message at level 'Error' inside function 'inner'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"WARN","fields":{"message":"message at level 'Warn' inside function 'inner'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"ERROR","fields":{"message":"message at level 'Error' inside function 'nested_inner_function', called from inside 'inner'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"WARN","fields":{"message":"message at level 'Warn' inside function 'nested_inner_function', called from inside 'inner'"},"target":"traceconf::debug_output_format"}

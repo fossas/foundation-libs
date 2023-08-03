@@ -99,7 +99,7 @@ use std::io::{self, Write};
 
 use clap::{Parser, ValueEnum};
 use getset::CopyGetters;
-use strum::Display;
+use strum::{Display, EnumIter};
 use tracing::{metadata::LevelFilter, Subscriber};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, Layer, Registry};
 
@@ -120,21 +120,27 @@ pub use debug_output_format::run as debug_output_format;
 /// If this is not desired, embed the types directly into your arguments structure,
 /// using this struct as an example only. If you create your own argument structure,
 /// you can use the `subscriber` method as a reference for how to use the arguments.
+///
+/// You can also use each type's `Default` implementation for the defaults in this crate.
 #[derive(Debug, Parser, CopyGetters)]
 #[clap(version)]
 #[getset(get_copy = "pub")]
 pub struct TracingConfig {
     /// Set the minimum level for logs. Logs below this level are dropped.
-    #[clap(long, global = true, default_value_t = Level::Info)]
+    #[clap(long, global = true, default_value_t = Level::default())]
     trace_level: Level,
 
     /// Enable span traces in logs. Span traces report on units of work performed by the program.
-    #[clap(long, global = true, default_value_t = Span::Off)]
+    #[clap(long, global = true, default_value_t = Span::default())]
     trace_spans: Span,
 
     /// The formatter to use for log and span traces.
-    #[clap(long, global = true, default_value_t = Format::Text)]
+    #[clap(long, global = true, default_value_t = Format::default())]
     trace_format: Format,
+
+    /// The coloring mode to use for log and span traces.
+    #[clap(long, global = true, default_value_t = Colors::default())]
+    trace_colors: Colors,
 }
 
 impl TracingConfig {
@@ -204,6 +210,7 @@ impl TracingConfig {
         Registry::default()
             .with(
                 tracing_subscriber::fmt::layer()
+                    .with_ansi(self.trace_colors == Colors::Enable)
                     .with_writer(move || writer_for(Format::Text))
                     .with_file(false)
                     .with_line_number(false)
@@ -213,6 +220,7 @@ impl TracingConfig {
             .with(
                 tracing_subscriber::fmt::layer()
                     .json()
+                    .with_ansi(self.trace_colors == Colors::Enable)
                     .with_writer(move || writer_for(Format::Json))
                     .with_span_events(self.fmt_span())
                     .with_filter(self.level_filter()),
@@ -221,7 +229,7 @@ impl TracingConfig {
 }
 
 /// The log formatting to use.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
 pub enum Format {
     /// Output text formatted logs and traces for humans.
     #[strum(serialize = "text")]
@@ -232,8 +240,34 @@ pub enum Format {
     Json,
 }
 
+impl Default for Format {
+    fn default() -> Self {
+        Self::Text
+    }
+}
+
+/// The terminal color modes to use.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+pub enum Colors {
+    /// Output text with coloring.
+    #[strum(serialize = "enable")]
+    Enable,
+
+    /// Output text without coloring.
+    #[strum(serialize = "disable")]
+    Disable,
+}
+
+impl Default for Colors {
+    fn default() -> Self {
+        Self::Enable
+    }
+}
+
 /// The minimum level to output.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display)]
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Parser, ValueEnum, Display, EnumIter,
+)]
 pub enum Level {
     /// Do not emit events.
     #[strum(serialize = "off")]
@@ -260,6 +294,12 @@ pub enum Level {
     Trace,
 }
 
+impl Default for Level {
+    fn default() -> Self {
+        Self::Info
+    }
+}
+
 impl From<Level> for LevelFilter {
     fn from(value: Level) -> Self {
         match value {
@@ -274,7 +314,7 @@ impl From<Level> for LevelFilter {
 }
 
 /// Which parts of span traces to output.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
 pub enum Span {
     /// Do not log span traces.
     #[strum(serialize = "off")]
@@ -303,6 +343,12 @@ pub enum Span {
     /// Combination of all events.
     #[strum(serialize = "full")]
     Full,
+}
+
+impl Default for Span {
+    fn default() -> Self {
+        Self::Off
+    }
 }
 
 impl From<Span> for FmtSpan {
