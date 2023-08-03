@@ -32,3 +32,7 @@ jobs:
           FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
           # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
           # ENABLE_NETWORK_TESTS: "1"
+      # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
+      # run doctests after; this won't result in any extra rebuilds and is very quick.
+      # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
+      - run: cargo test --doc
