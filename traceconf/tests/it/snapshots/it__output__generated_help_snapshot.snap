@@ -4,7 +4,7 @@ expression: output
 ---
 Example for how to utilize `traceconf` in another program
 
-Usage: traceconf [OPTIONS] <COMMAND>
+Usage: 
 
 Commands:
   hello                Say hello

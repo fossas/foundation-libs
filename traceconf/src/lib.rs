@@ -125,6 +125,7 @@ pub use debug_output_format::run as debug_output_format;
 #[derive(Debug, Parser, CopyGetters)]
 #[clap(version)]
 #[getset(get_copy = "pub")]
+#[non_exhaustive]
 pub struct TracingConfig {
     /// Set the minimum level for logs. Logs below this level are dropped.
     #[clap(long, global = true, default_value_t = Level::default())]
@@ -236,6 +237,7 @@ impl TracingConfig {
 
 /// The log formatting to use.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+#[non_exhaustive]
 pub enum Format {
     /// Output text formatted logs and traces for humans.
     #[strum(serialize = "text")]
@@ -254,6 +256,7 @@ impl Default for Format {
 
 /// The terminal color modes to use.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+#[non_exhaustive]
 pub enum Colors {
     /// Choose to output text with coloring or not by checking
     /// for whether stderr is an interactive terminal session.
@@ -279,6 +282,7 @@ impl Default for Colors {
 #[derive(
     Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Parser, ValueEnum, Display, EnumIter,
 )]
+#[non_exhaustive]
 pub enum Level {
     /// Do not emit events.
     #[strum(serialize = "off")]
@@ -326,6 +330,7 @@ impl From<Level> for LevelFilter {
 
 /// Which parts of span traces to output.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+#[non_exhaustive]
 pub enum Span {
     /// Do not log span traces.
     #[strum(serialize = "off")]
