@@ -29,7 +29,7 @@ jobs:
       - run: cargo nextest run
         env:
           FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-          FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
+          FOSSA_ORG_ID: ${{ vars.FOSSA_ORG_ID }}
           # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
           # ENABLE_NETWORK_TESTS: "1"
       # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
