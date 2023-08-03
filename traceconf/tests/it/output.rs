@@ -27,7 +27,7 @@ fn debug_output_format_text() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
         (r#"[0-9\-]+T[0-9:]+\.\d{6}Z"#, "{timestamp}"),
-        (r#"=\d+(\.\d+)?µs"#, "={timespan}"),
+        (r#"=\d+(\.\d+)?(µs|ms)"#, "={timespan}"),
     ];
 
     // Test that every combination of (format, level, span)
@@ -67,7 +67,7 @@ fn debug_output_format_json() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
         (r#"[0-9\-]+T[0-9:]+\.\d{6}Z"#, "<timestamp>"),
-        (r#"\d+(\.\d+)?µs"#, "<timespan>"),
+        (r#"\d+(\.\d+)?(µs|ms)"#, "<timespan>"),
     ];
 
     // Test that every combination of (format, level, span)
@@ -107,7 +107,7 @@ fn debug_output_format_text_colors() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
         (r#"[0-9\-]+T[0-9:]+\.\d{6}Z"#, "{timestamp}"),
-        (r#"\d+(\.\d+)?µs"#, "{timespan}"),
+        (r#"\d+(\.\d+)?(µs|ms)"#, "{timespan}"),
     ];
 
     let format = traceconf::Format::Text.to_string();
@@ -128,7 +128,7 @@ fn debug_output_format_json_colors() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
         (r#"[0-9\-]+T[0-9:]+\.\d{6}Z"#, "<timestamp>"),
-        (r#"\d+(\.\d+)?µs"#, "<timespan>"),
+        (r#"\d+(\.\d+)?(µs|ms)"#, "<timespan>"),
     ];
 
     let format = traceconf::Format::Json.to_string();
