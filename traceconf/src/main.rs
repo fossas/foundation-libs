@@ -70,7 +70,7 @@ enum Commands {
     DebugOutputFormat,
 }
 
-/// Arguments used by the "walk" command.
+/// Arguments used by the "hello" command.
 #[derive(Debug, Clone, Parser)]
 pub struct HelloArgs {
     /// To whom should we say hello?
@@ -88,6 +88,7 @@ fn main() {
     let subscriber = opts.tracing.subscriber();
     tracing::subscriber::set_global_default(subscriber).expect("set global trace subscriber");
 
+    // Dispatch the subcommand.
     match opts.command {
         Commands::Hello(args) => main_hello(args),
         Commands::DebugOutputFormat => traceconf::debug_output_format(),
