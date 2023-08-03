@@ -155,6 +155,15 @@ impl TracingConfig {
         self.trace_spans.into()
     }
 
+    /// Determine whether colors should be enabled for tracing output.
+    pub fn colors_enabled(&self) -> bool {
+        match self.trace_colors {
+            Colors::Auto => atty::is(atty::Stream::Stderr),
+            Colors::Enable => true,
+            Colors::Disable => false,
+        }
+    }
+
     /// Configure a [`Subscriber`] implementation for these options.
     ///
     /// Note: If your program must be very performant,
@@ -208,16 +217,10 @@ impl TracingConfig {
             }
         };
 
-        let colors_enabled = match self.trace_colors {
-            Colors::Auto => atty::is(atty::Stream::Stderr),
-            Colors::Enable => true,
-            Colors::Disable => false,
-        };
-
         Registry::default()
             .with(
                 tracing_subscriber::fmt::layer()
-                    .with_ansi(colors_enabled)
+                    .with_ansi(self.colors_enabled())
                     .with_writer(move || writer_for(Format::Text))
                     .with_file(false)
                     .with_line_number(false)
@@ -227,7 +230,7 @@ impl TracingConfig {
             .with(
                 tracing_subscriber::fmt::layer()
                     .json()
-                    .with_ansi(colors_enabled)
+                    .with_ansi(self.colors_enabled())
                     .with_writer(move || writer_for(Format::Json))
                     .with_span_events(self.fmt_span())
                     .with_filter(self.level_filter()),
