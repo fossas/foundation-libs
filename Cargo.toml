@@ -5,6 +5,7 @@ members = [
   "fingerprint",
   "vsi",
   "srclib",
+  "traceconf",
 ]
 
 [profile.dev.package.backtrace]
