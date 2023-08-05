@@ -1,0 +1,10 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+{timestamp} ERROR traceconf::debug_output_format: message at level 'Error'
+{timestamp}  WARN traceconf::debug_output_format: message at level 'Warn'
+{timestamp} ERROR traceconf::debug_output_format: message at level 'Error' inside function 'inner'
+{timestamp}  WARN traceconf::debug_output_format: message at level 'Warn' inside function 'inner'
+{timestamp} ERROR traceconf::debug_output_format: message at level 'Error' inside function 'nested_inner_function', called from inside 'inner'
+{timestamp}  WARN traceconf::debug_output_format: message at level 'Warn' inside function 'nested_inner_function', called from inside 'inner'

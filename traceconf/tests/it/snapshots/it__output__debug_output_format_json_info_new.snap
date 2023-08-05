@@ -1,0 +1,30 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"demonstrating how messages are logged."},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":""},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"ERROR","fields":{"message":"message at level 'Error'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"message at level 'Info'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"WARN","fields":{"message":"message at level 'Warn'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":""},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"-------"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"demonstrating how spans are logged."},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"calling 'uppercase' with the argument 'hello', then logging the result:"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":""},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"the word 'hello' uppercased is..."},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"new"},"target":"traceconf::debug_output_format","span":{"input":"hello","name":"uppercase"},"spans":[]}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"> 'HELLO'"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":""},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"-------"},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"demonstrating how nested spans are logged."},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"calling the function 'inner' with an argument, which will in turn call 'nested_inner' with a different argument."},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":""},"target":"traceconf::debug_output_format"}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"new"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'inner'","name":"inner"},"spans":[]}
+{"timestamp":"<timestamp>","level":"ERROR","fields":{"message":"message at level 'Error' inside function 'inner'"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'inner'","name":"inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"}]}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"message at level 'Info' inside function 'inner'"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'inner'","name":"inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"}]}
+{"timestamp":"<timestamp>","level":"WARN","fields":{"message":"message at level 'Warn' inside function 'inner'"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'inner'","name":"inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"}]}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"new"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'nested_inner'","name":"nested_inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"}]}
+{"timestamp":"<timestamp>","level":"ERROR","fields":{"message":"message at level 'Error' inside function 'nested_inner_function', called from inside 'inner'"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'nested_inner'","name":"nested_inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"},{"value":"some value passed to 'nested_inner'","name":"nested_inner"}]}
+{"timestamp":"<timestamp>","level":"INFO","fields":{"message":"message at level 'Info' inside function 'nested_inner_function', called from inside 'inner'"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'nested_inner'","name":"nested_inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"},{"value":"some value passed to 'nested_inner'","name":"nested_inner"}]}
+{"timestamp":"<timestamp>","level":"WARN","fields":{"message":"message at level 'Warn' inside function 'nested_inner_function', called from inside 'inner'"},"target":"traceconf::debug_output_format","span":{"value":"some value passed to 'nested_inner'","name":"nested_inner"},"spans":[{"value":"some value passed to 'inner'","name":"inner"},{"value":"some value passed to 'nested_inner'","name":"nested_inner"}]}

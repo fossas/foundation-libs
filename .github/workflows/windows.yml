@@ -42,6 +42,14 @@ jobs:
           VCPKGRS_DYNAMIC: 0
           VCPKG_DEFAULT_TRIPLET: x64-windows-static
           FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-          FOSSA_ORG_ID: ${{ secrets.FOSSA_ORG_ID }}
+          FOSSA_ORG_ID: ${{ vars.FOSSA_ORG_ID }}
           # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
           # ENABLE_NETWORK_TESTS: "1"
+      # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
+      # run doctests after; this won't result in any extra rebuilds and is very quick.
+      # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
+      - run: cargo test --doc
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static

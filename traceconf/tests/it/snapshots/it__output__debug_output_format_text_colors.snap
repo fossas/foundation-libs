@@ -1,0 +1,45 @@
+---
+source: traceconf/tests/it/output.rs
+expression: output
+---
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m demonstrating how messages are logged.
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m 
+[2m{timestamp}[0m [31mERROR[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Error'
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Info'
+[2m{timestamp}[0m [33m WARN[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Warn'
+[2m{timestamp}[0m [34mDEBUG[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Debug'
+[2m{timestamp}[0m [35mTRACE[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Trace'
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m 
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m -------
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m demonstrating how spans are logged.
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m calling 'uppercase' with the argument 'hello', then logging the result:
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m 
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m the word 'hello' uppercased is...
+[2m{timestamp}[0m [32m INFO[0m [1muppercase[0m[1m{[0m[3minput[0m[2m=[0m"hello"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m new
+[2m{timestamp}[0m [32m INFO[0m [1muppercase[0m[1m{[0m[3minput[0m[2m=[0m"hello"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m enter
+[2m{timestamp}[0m [32m INFO[0m [1muppercase[0m[1m{[0m[3minput[0m[2m=[0m"hello" [3muppercased[0m[2m=[0m"HELLO"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m exit
+[2m{timestamp}[0m [32m INFO[0m [1muppercase[0m[1m{[0m[3minput[0m[2m=[0m"hello" [3muppercased[0m[2m=[0m"HELLO"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m close [3mtime.busy[0m[2m=[0m{timespan} [3mtime.idle[0m[2m=[0m{timespan}
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m > 'HELLO'
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m 
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m -------
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m demonstrating how nested spans are logged.
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m calling the function 'inner' with an argument, which will in turn call 'nested_inner' with a different argument.
+[2m{timestamp}[0m [32m INFO[0m [2mtraceconf::debug_output_format[0m[2m:[0m 
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m new
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m enter
+[2m{timestamp}[0m [31mERROR[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Error' inside function 'inner'
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Info' inside function 'inner'
+[2m{timestamp}[0m [33m WARN[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Warn' inside function 'inner'
+[2m{timestamp}[0m [34mDEBUG[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Debug' inside function 'inner'
+[2m{timestamp}[0m [35mTRACE[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Trace' inside function 'inner'
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m new
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m enter
+[2m{timestamp}[0m [31mERROR[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Error' inside function 'nested_inner_function', called from inside 'inner'
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Info' inside function 'nested_inner_function', called from inside 'inner'
+[2m{timestamp}[0m [33m WARN[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Warn' inside function 'nested_inner_function', called from inside 'inner'
+[2m{timestamp}[0m [34mDEBUG[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Debug' inside function 'nested_inner_function', called from inside 'inner'
+[2m{timestamp}[0m [35mTRACE[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m message at level 'Trace' inside function 'nested_inner_function', called from inside 'inner'
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m exit
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m[1mnested_inner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'nested_inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m close [3mtime.busy[0m[2m=[0m{timespan} [3mtime.idle[0m[2m=[0m{timespan}
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m exit
+[2m{timestamp}[0m [32m INFO[0m [1minner[0m[1m{[0m[3mvalue[0m[2m=[0m"some value passed to 'inner'"[1m}[0m[2m:[0m [2mtraceconf::debug_output_format[0m[2m:[0m close [3mtime.busy[0m[2m=[0m{timespan} [3mtime.idle[0m[2m=[0m{timespan}

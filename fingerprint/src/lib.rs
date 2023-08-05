@@ -25,7 +25,7 @@ use std::{
     path::Path,
 };
 
-use fingerprint::BinaryCheck;
+use crate::fingerprint::BinaryCheck;
 use getset::Getters;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
