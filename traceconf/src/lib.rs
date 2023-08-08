@@ -239,15 +239,18 @@ impl TracingConfig {
 }
 
 /// The log formatting to use.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, Display, ValueEnum, EnumIter)]
+#[cfg_attr(
+    feature = "serde",
+    derive(strum::EnumVariantNames, strum::IntoStaticStr, strum::EnumString)
+)]
+#[strum(serialize_all = "snake_case", ascii_case_insensitive)]
 #[non_exhaustive]
 pub enum Format {
     /// Output text formatted logs and traces for humans.
-    #[strum(serialize = "text")]
     Text,
 
     /// Output JSON formatted logs and traces for machines.
-    #[strum(serialize = "json")]
     Json,
 }
 
@@ -258,20 +261,22 @@ impl Default for Format {
 }
 
 /// The terminal color modes to use.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, Display, ValueEnum, EnumIter)]
+#[cfg_attr(
+    feature = "serde",
+    derive(strum::EnumVariantNames, strum::IntoStaticStr, strum::EnumString)
+)]
+#[strum(serialize_all = "snake_case", ascii_case_insensitive)]
 #[non_exhaustive]
 pub enum Colors {
     /// Choose to output text with coloring or not by checking
     /// for whether stderr is an interactive terminal session.
-    #[strum(serialize = "auto")]
     Auto,
 
     /// Output text with coloring.
-    #[strum(serialize = "enable")]
     Enable,
 
     /// Output text without coloring.
-    #[strum(serialize = "disable")]
     Disable,
 }
 
@@ -285,30 +290,29 @@ impl Default for Colors {
 #[derive(
     Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Parser, ValueEnum, Display, EnumIter,
 )]
+#[cfg_attr(
+    feature = "serde",
+    derive(strum::EnumVariantNames, strum::IntoStaticStr, strum::EnumString)
+)]
+#[strum(serialize_all = "snake_case", ascii_case_insensitive)]
 #[non_exhaustive]
 pub enum Level {
     /// Do not emit events.
-    #[strum(serialize = "off")]
     Off,
 
     /// Emit events that are 'Error' level or higher.
-    #[strum(serialize = "error")]
     Error,
 
     /// Emit events that are 'Warn' level or higher.
-    #[strum(serialize = "warn")]
     Warn,
 
     /// Emit events that are 'Info' level or higher.
-    #[strum(serialize = "info")]
     Info,
 
     /// Emit events that are 'Debug' level or higher.
-    #[strum(serialize = "debug")]
     Debug,
 
     /// Emit events that are 'Trace' level or higher.
-    #[strum(serialize = "trace")]
     Trace,
 }
 
@@ -332,35 +336,33 @@ impl From<Level> for LevelFilter {
 }
 
 /// Which parts of span traces to output.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, ValueEnum, Display, EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Parser, Display, ValueEnum, EnumIter)]
+#[cfg_attr(
+    feature = "serde",
+    derive(strum::EnumVariantNames, strum::IntoStaticStr, strum::EnumString)
+)]
+#[strum(serialize_all = "snake_case", ascii_case_insensitive)]
 #[non_exhaustive]
 pub enum Span {
     /// Do not log span traces.
-    #[strum(serialize = "off")]
     Off,
 
     /// One event when the span is created.
-    #[strum(serialize = "new")]
     New,
 
     /// One event when the span begins executing.
-    #[strum(serialize = "enter")]
     Enter,
 
     /// One event when the span suspends or finishes executing.
-    #[strum(serialize = "exit")]
     Exit,
 
     /// One event when the span context is dropped after fully executing.
-    #[strum(serialize = "close")]
     Close,
 
     /// Combination of 'Enter' and 'Exit' events.
-    #[strum(serialize = "active")]
     Active,
 
     /// Combination of all events.
-    #[strum(serialize = "full")]
     Full,
 }
 
@@ -383,3 +385,44 @@ impl From<Span> for FmtSpan {
         }
     }
 }
+
+/// Generate custom serde de/serialization for the specified type.
+#[cfg(feature = "serde")]
+macro_rules! impl_serde {
+    ($t:ty) => {
+        /// [`serde_enum_str::Deserialize_enum_str`] gets confused and cannot derive for [`Level`],
+        /// because [`Level::Error`] is ambiguous with [`TryFrom::Error`] in its generated implementation.
+        impl<'de> serde::Deserialize<'de> for $t {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let s: &str = serde::de::Deserialize::deserialize(deserializer)?;
+                Self::try_from(s).map_err(|_| {
+                    let variants = <Self as strum::VariantNames>::VARIANTS;
+                    serde::de::Error::unknown_variant(s, variants)
+                })
+            }
+        }
+
+        /// Since [`serde::Deserialize`] has to be manually implemented,
+        /// manually implement [`serde::Serialize`] as well to ensure they match.
+        impl serde::Serialize for $t {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(self.into())
+            }
+        }
+    };
+}
+
+#[cfg(feature = "serde")]
+impl_serde!(Level);
+#[cfg(feature = "serde")]
+impl_serde!(Span);
+#[cfg(feature = "serde")]
+impl_serde!(Colors);
+#[cfg(feature = "serde")]
+impl_serde!(Format);
