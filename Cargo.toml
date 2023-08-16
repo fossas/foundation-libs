@@ -6,6 +6,7 @@ members = [
   "vsi",
   "srclib",
   "traceconf",
+  "tracer",
 ]
 
 [profile.dev.package.backtrace]

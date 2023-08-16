@@ -36,3 +36,5 @@ jobs:
       # run doctests after; this won't result in any extra rebuilds and is very quick.
       # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
       - run: cargo test --doc
+      # run tests for specific library features
+      - run: cargo test -p traceconf --features serde
