@@ -23,6 +23,7 @@ fn generated_help_short_snapshot() {
 }
 
 #[test]
+#[ignore = "prompts SIGKILL in macOS CI, I think due to memory pressure"]
 fn debug_output_format_text() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
@@ -63,6 +64,7 @@ fn debug_output_format_text() {
 }
 
 #[test]
+#[ignore = "prompts SIGKILL in macOS CI, I think due to memory pressure"]
 fn debug_output_format_json() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
@@ -103,6 +105,7 @@ fn debug_output_format_json() {
 }
 
 #[test]
+#[ignore = "prompts SIGKILL in macOS CI, I think due to memory pressure"]
 fn debug_output_format_text_colors() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
@@ -124,6 +127,7 @@ fn debug_output_format_text_colors() {
 }
 
 #[test]
+#[ignore = "prompts SIGKILL in macOS CI, I think due to memory pressure"]
 fn debug_output_format_json_colors() {
     let sh = Shell::new().expect("create shell");
     let filters = vec![
