@@ -253,14 +253,14 @@ pub enum Kind {
 ///
 /// ```
 /// # use snippets::*;
-/// # let arbitrary_flagset = flagset::FlagSet::<Normalization>::from(Normalization::Space);
+/// # let arbitrary_flagset = Transforms::from(Transform::Space);
 /// assert!(Method::Raw > Method::Normalized(arbitrary_flagset));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum Method {
     /// Generated from the text with the specified normalizations applied.
-    Normalized(Normalizations),
+    Normalized(Transforms),
 
     /// Generated from the text as written.
     ///
@@ -279,20 +279,20 @@ flags! {
     /// # Specificity order
     ///
     /// Specificity is in the order specified by the implementation of [`Ord`] for this type,
-    /// meaning that a [`Normalization::Space`] variant is considered a more exact match
-    /// than a [`Normalization::Comment`] variant.
+    /// meaning that a [`Transform::Space`] variant is considered a more exact match
+    /// than a [`Transform::Comment`] variant.
     ///
     /// Items with higher "specificity order" are sorted _higher_; meaning that a
-    /// [`Normalization::Space`] variant would be sorted later in a vector
-    /// than a [`Normalization::Comment`] variant:
+    /// [`Transform::Space`] variant would be sorted later in a vector
+    /// than a [`Transform::Comment`] variant:
     ///
     /// ```
     /// # use snippets::*;
-    /// assert!(Normalization::Space > Normalization::Comment);
+    /// assert!(Transform::Space > Transform::Comment);
     /// ```
     #[derive(Hash, PartialOrd, Ord, EnumIter)]
     #[non_exhaustive]
-    pub enum Normalization: u8 {
+    pub enum Transform: u8 {
         /// Generated with any comments removed. Exactly what constitutes a comment is up to the implementation
         /// of the [`Extractor`] for the language being analyzed.
         ///
@@ -336,7 +336,7 @@ flags! {
     }
 }
 
-impl Normalization {
+impl Transform {
     /// Scores each variant on its specificity order.
     ///
     /// Implemented manually for now, if we ever get lots of variant churn we can look into a macro.
@@ -349,8 +349,8 @@ impl Normalization {
     /// Scores that are truly equivalent may be given equivalent scores.
     fn score(self) -> usize {
         match self {
-            Normalization::Comment => 1,
-            Normalization::Space => 2,
+            Transform::Comment => 1,
+            Transform::Space => 2,
         }
     }
 }
@@ -359,37 +359,37 @@ impl Normalization {
 ///
 /// # Specificity order
 ///
-/// As discussed on [`Normalization`], flags are already ordered by specificity, such that higher
+/// As discussed on [`Transform`], flags are already ordered by specificity, such that higher
 /// specificity flags are ordered later in a collection.
 ///
-/// For [`Normalizations`] (this type), it's a little different. Since the goal of "specificity order"
+/// For [`Transforms`] (this type), it's a little different. Since the goal of "specificity order"
 /// is to sort snippets higher that are _less modified_ from the original source code,
 /// this type is ordered such that:
-/// - If there is a single [`Normalization`] in compared sets, they're sorted as usual.
-/// - If there are multiple [`Normalization`]s in compared sets, sets with fewer members are higher specificity.
+/// - If there is a single [`Transform`] in compared sets, they're sorted as usual.
+/// - If there are multiple [`Transform`]s in compared sets, sets with fewer members are higher specificity.
 /// - For sets with the same number of members, sets are compared with the scores of their composite variants.
 ///
 /// This works because in this case "more flags" means "more normalizations applied to the source",
 /// which means that they are _less_ specific. Meanwhile, if the count of flags are equal,
 /// the flags used can be extracted and compared by their score.
 ///
-/// To give examples using [`Normalization`]
+/// To give examples using [`Transform`]
 /// (assume a third pretend variant "Other" and pretend it is lower specificity than "Comment"):
 /// - `[Space] > [Comment]`: same as standalone.
 /// - `[Comment] > [Space,Comment]`: fewer modifications.
 /// - `[Space,Comment] > [Comment,Other]`: the score of "Space+Comment" is higher than "Comment+Other".
 ///
 /// Scores are set based on the specificity of the variant.
-/// For example, [`Normalization::Comment`] is scored `1`, as the lowest specificity;
-/// meanwhile [`Normalization::Space`] is scored `2` as the next lowest specificity,
+/// For example, [`Transform::Comment`] is scored `1`, as the lowest specificity;
+/// meanwhile [`Transform::Space`] is scored `2` as the next lowest specificity,
 /// and so on.
 /// Specific score values are not meaningful other than as a non-durable comparison to one another.
 ///
 /// # Application order
 ///
 /// The order that combinations of flags are applied matters: for instance, note the example for
-/// [`Normalization::Space`] creates a syntax error, and the entire function body
-/// would be removed if it was performed before [`Normalization::Comment`].
+/// [`Transform::Space`] creates a syntax error, and the entire function body
+/// would be removed if it was performed before [`Transform::Comment`].
 ///
 /// The application order is therefore up to the implementation of [`Extractor`];
 /// users are only able to specify which normalizations are performed.
@@ -397,26 +397,26 @@ impl Normalization {
 /// It also follows that implementations of [`Extractor`] do not necessarily obey
 /// the specificity order of normalizations when applying normalizations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Normalizations(FlagSet<Normalization>);
+pub struct Transforms(FlagSet<Transform>);
 
-impl Normalizations {
+impl Transforms {
     /// Scores each variant in self on its specificity order,
     /// returning the summed score and the count of applied normalizations.
     fn score_count(self) -> (usize, usize) {
         self.0
             .into_iter()
-            .map(Normalization::score)
+            .map(Transform::score)
             .fold((0, 0), |(prev, len), score| (prev + score, len + 1))
     }
 }
 
-impl PartialOrd for Normalizations {
+impl PartialOrd for Transforms {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Normalizations {
+impl Ord for Transforms {
     fn cmp(&self, other: &Self) -> Ordering {
         let (self_score, self_len) = self.score_count();
         let (other_score, other_len) = other.score_count();
@@ -428,6 +428,18 @@ impl Ord for Normalizations {
             // Equal count of normalizations in set; order by score.
             Ordering::Equal => self_score.cmp(&other_score),
         }
+    }
+}
+
+impl From<FlagSet<Transform>> for Transforms {
+    fn from(value: FlagSet<Transform>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Transform> for Transforms {
+    fn from(value: Transform) -> Self {
+        Self(value.into())
     }
 }
 
@@ -445,7 +457,7 @@ mod tests {
 
     #[test]
     fn specificity_order_method() {
-        let arbitrary_flags = Normalizations(Normalization::Space | Normalization::Comment);
+        let arbitrary_flags = Transforms(Transform::Space | Transform::Comment);
         let mut input = vec![Method::Raw, Method::Normalized(arbitrary_flags)];
         input.sort_unstable();
 
@@ -455,22 +467,22 @@ mod tests {
 
     #[test]
     fn specificity_order_normalization() {
-        let mut input = vec![Normalization::Space, Normalization::Comment];
+        let mut input = vec![Transform::Space, Transform::Comment];
         input.sort_unstable();
-        assert_eq!(input, vec![Normalization::Comment, Normalization::Space]);
+        assert_eq!(input, vec![Transform::Comment, Transform::Space]);
     }
 
     #[test]
     fn specificity_order_normalizations() {
         let mut input = vec![
-            Normalizations(FlagSet::from(Normalization::Comment)),
-            Normalizations(Normalization::Space | Normalization::Comment),
-            Normalizations(FlagSet::from(Normalization::Space)),
+            Transforms(FlagSet::from(Transform::Comment)),
+            Transforms(Transform::Space | Transform::Comment),
+            Transforms(FlagSet::from(Transform::Space)),
         ];
         let expected = vec![
-            Normalizations(Normalization::Space | Normalization::Comment),
-            Normalizations(FlagSet::from(Normalization::Comment)),
-            Normalizations(FlagSet::from(Normalization::Space)),
+            Transforms(Transform::Space | Transform::Comment),
+            Transforms(FlagSet::from(Transform::Comment)),
+            Transforms(FlagSet::from(Transform::Space)),
         ];
 
         input.sort_unstable();
@@ -493,12 +505,12 @@ mod tests {
     #[test]
     fn normalizations_count() {
         let scores = [
-            (FlagSet::from(Normalization::Comment), 1),
-            (FlagSet::from(Normalization::Space), 1),
-            (Normalization::Comment | Normalization::Space, 2),
+            (FlagSet::from(Transform::Comment), 1),
+            (FlagSet::from(Transform::Space), 1),
+            (Transform::Comment | Transform::Space, 2),
         ];
         for (set, expected) in scores {
-            let (_, len) = Normalizations(set).score_count();
+            let (_, len) = Transforms(set).score_count();
             assert_eq!(len, expected, "set: {set:?}");
         }
     }
@@ -506,12 +518,12 @@ mod tests {
     #[test]
     fn normalizations_score() {
         let scores = [
-            (FlagSet::from(Normalization::Comment), 1),
-            (FlagSet::from(Normalization::Space), 2),
-            (Normalization::Comment | Normalization::Space, 3),
+            (FlagSet::from(Transform::Comment), 1),
+            (FlagSet::from(Transform::Space), 2),
+            (Transform::Comment | Transform::Space, 3),
         ];
         for (set, expected) in scores {
-            let (score, _) = Normalizations(set).score_count();
+            let (score, _) = Transforms(set).score_count();
             assert_eq!(score, expected, "set: {set:?}");
         }
     }
