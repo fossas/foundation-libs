@@ -21,16 +21,38 @@
 //!
 //! (TODO)
 
-use std::{cmp::Ordering, io::Read};
+use std::{cmp::Ordering, io::Read, marker::PhantomData};
 
 use derivative::Derivative;
 use derive_more::{Deref, Index};
-use fallible_iterator::FallibleIterator;
+pub use fallible_iterator::FallibleIterator;
 use flagset::{flags, FlagSet};
 use getset::{CopyGetters, Getters};
+use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use strum::{Display, EnumIter};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+
+pub mod language;
+
+/// Convenience import for all types that
+/// an implementation of [`Extractor`] would likely need.
+///
+/// Some commonly-named types are renamed to reduce the liklihood of collisions
+/// when imported via this prelude: e.g. [`Error`] becomes [`ExtractorError`].
+///
+/// [`Extractor`]: crate::Extractor
+/// [`Error`]: crate::Error
+pub mod impl_prelude {
+    pub use super::{
+        Error as ExtractorError, ExtractIterator, Extractor as SnippetExtractor,
+        Kind as SnippetKind, Language as SnippetLanguage, Location as SnippetLocation,
+        Metadata as SnippetMetadata, Method as SnippetMethod, Snippet,
+        Strategy as LanguageStrategy, Support, Transform as SnippetTransform,
+        Transforms as SnippetTransforms,
+    };
+}
 
 /// Errors reported by [`Extractor`].
 #[derive(Debug, Error)]
@@ -49,7 +71,10 @@ pub trait Extractor {
     /// However most extractors are encouraged to use the standard [`Support`] type if possible,
     /// and indeed the custom type must be able to translate to the standard type
     /// in order to work with the rest of the library.
-    type Support: std::fmt::Debug + Into<Support>;
+    type Support: Into<Support>;
+
+    /// The source language supported by the implementation.
+    type Language: Language;
 
     /// Reports the support status for extractor in regards to the provided unit of source code.
     ///
@@ -63,9 +88,52 @@ pub trait Extractor {
     /// # Reader
     ///
     /// The [`Read`] instance provided to `source` may be partially or fully consumed during this process.
+    ///
     /// If the reader was previously read (partially or fully, by example via [`Extractor::support`]),
     /// it almost definitely needs to be reset to the initial point before using this method.
-    fn extract<R: Read, I: FallibleIterator<Item = Snippet, Error = Error>>(source: R) -> I;
+    fn extract<R: Read, I: ExtractIterator<Self::Language>>(source: R) -> I;
+}
+
+/// Convenience type for a fallible iterator that generates snippets of the provided language.
+// It's not possible to type alias traits; instead we define a new trait that
+// depends on the base trait and then implement this new trait for anything
+// that implements the base trait.
+pub trait ExtractIterator<L>: FallibleIterator<Item = Snippet<L>, Error = Error> {}
+impl<L, I: FallibleIterator<Item = Snippet<L>, Error = Error>> ExtractIterator<L> for I {}
+
+/// Standardizes the description of languages supported by [`Extractor`] implementations.
+pub trait Language {
+    /// The name of the language.
+    const NAME: &'static str;
+
+    /// The strategy used for parsing the language.
+    const STRATEGY: Strategy;
+
+    /// Override the display of the language name if desired.
+    fn display() -> &'static str {
+        static DISPLAY: OnceCell<String> = OnceCell::new();
+        DISPLAY.get_or_init(|| format!("{}/{}", Self::NAME, Self::STRATEGY))
+    }
+}
+
+/// Many programming languages include compile-time metaprogramming,
+/// for example C and C++ have [preprocessing macros],
+/// Rust has [multiple types of macros],
+/// Haskell has [Template Haskell], and more.
+///
+/// This type allows a [`Language`], specified for an [`Extractor`],
+/// to advertise the kind of parsing strategy it employs to parse the language.
+///
+/// [preprocessing macros]: https://gcc.gnu.org/onlinedocs/cpp/Macros.html
+/// [multiple types of macros]: https://doc.rust-lang.org/book/ch19-06-macros.html
+/// [Template Haskell]: http://wiki.haskell.org/Template_Haskell
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
+#[strum(serialize_all = "snake_case")]
+#[non_exhaustive]
+pub enum Strategy {
+    /// The extractor statically analyzes the code.
+    /// No compile time metaprogramming is evaluated.
+    Static,
 }
 
 /// An implementation of [`Extractor`] may support source code to varying extent.
@@ -86,19 +154,31 @@ pub enum Support {
 }
 
 /// An extracted snippet from the given unit of source code.
-#[derive(Debug, Clone, PartialEq, Eq, Getters, CopyGetters, Index, Deref, Derivative)]
-#[derivative(PartialOrd, Ord)]
-pub struct Snippet {
-    /// The raw bytes of the snippet content.
-    #[getset(get = "pub")]
-    #[index]
-    #[deref]
-    #[derivative(PartialOrd = "ignore", Ord = "ignore")]
-    bytes: Vec<u8>,
-
+#[derive(Debug, Clone, Getters, CopyGetters, Index, Deref, Derivative)]
+#[derivative(PartialOrd, Ord, PartialEq, Eq)]
+pub struct Snippet<L> {
     /// Metadata for the extracted snippet.
     #[getset(get_copy = "pub")]
     metadata: Metadata,
+
+    /// The raw bytes of the snippet content.
+    #[index]
+    #[deref]
+    #[getset(get = "pub")]
+    #[derivative(PartialOrd = "ignore", Ord = "ignore")]
+    bytes: Vec<u8>,
+
+    /// Used to disambiguate snippets by source language.
+    ///
+    /// Technically this is evaluated for ordering and equality,
+    /// but `PhantomData<T>` is always equal to itself for both checks.
+    language: PhantomData<L>,
+}
+
+impl<L: Language> std::fmt::Display for Snippet<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", L::display(), self.metadata)
+    }
 }
 
 /// The metadata for an extracted snippet.
@@ -113,6 +193,12 @@ pub struct Metadata {
 
     /// The location at which the snippet was found.
     location: Location,
+}
+
+impl std::fmt::Display for Metadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}/{}", self.kind, self.method, self.location)
+    }
 }
 
 /// The location in the unit of source code from which the snippet was extracted.
@@ -165,6 +251,12 @@ pub struct Location {
     byte_len: ByteLen,
 }
 
+impl std::fmt::Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.byte_offset, self.byte_len)
+    }
+}
+
 impl Location {
     /// Read a [`Location`] as a range, intended to be used to index a `Vec<u8>` or `&[u8]`.
     pub fn as_range(&self) -> std::ops::RangeInclusive<usize> {
@@ -182,11 +274,11 @@ impl Location {
 ///
 /// Think of the offset as
 /// "the number of bytes to skip from the start of the file to when this snippet begins".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
 pub struct ByteOffset(u64);
 
 /// The number of bytes to read for the snippet from the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
 pub struct ByteLen(u64);
 
 /// The kind of item this snippet represents.
@@ -207,7 +299,8 @@ pub struct ByteLen(u64);
 /// assert!(Kind::Full > Kind::Body);
 /// assert!(Kind::Body > Kind::Signature);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, EnumIter, Display)]
+#[strum(serialize_all = "snake_case")]
 #[non_exhaustive]
 pub enum Kind {
     /// The signature of the function.
@@ -273,6 +366,15 @@ pub enum Method {
     Raw,
 }
 
+impl std::fmt::Display for Method {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Method::Normalized(transforms) => write!(f, "normalized({transforms})"),
+            Method::Raw => write!(f, "raw"),
+        }
+    }
+}
+
 flags! {
     /// The normalization used to generate this snippet.
     ///
@@ -290,7 +392,8 @@ flags! {
     /// # use snippets::*;
     /// assert!(Transform::Space > Transform::Comment);
     /// ```
-    #[derive(Hash, PartialOrd, Ord, EnumIter)]
+    #[derive(Hash, PartialOrd, Ord, EnumIter, Display)]
+    #[strum(serialize_all = "snake_case")]
     #[non_exhaustive]
     pub enum Transform: u8 {
         /// Generated with any comments removed. Exactly what constitutes a comment is up to the implementation
@@ -407,6 +510,19 @@ impl Transforms {
             .into_iter()
             .map(Transform::score)
             .fold((0, 0), |(prev, len), score| (prev + score, len + 1))
+    }
+}
+
+impl std::fmt::Display for Transforms {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let transforms = self
+            .0
+            .into_iter()
+            .sorted_unstable()
+            .map(|t| t.to_string())
+            .collect_vec()
+            .join(",");
+        write!(f, "{transforms}")
     }
 }
 
