@@ -46,8 +46,8 @@ pub mod language;
 /// [`Error`]: crate::Error
 pub mod impl_prelude {
     pub use super::{
-        Error as ExtractorError, ExtractIterator, Extractor as SnippetExtractor,
-        Kind as SnippetKind, Language as SnippetLanguage, Location as SnippetLocation,
+        Error as ExtractorError, Extractor as SnippetExtractor, Kind as SnippetKind,
+        Language as SnippetLanguage, LanguageError, Location as SnippetLocation,
         Metadata as SnippetMetadata, Method as SnippetMethod, Snippet,
         Strategy as LanguageStrategy, Support, Transform as SnippetTransform,
         Transforms as SnippetTransforms,
@@ -57,7 +57,17 @@ pub mod impl_prelude {
 /// Errors reported by [`Extractor`].
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum Error {}
+pub enum Error {
+    #[error("configure parser")]
+    Configure(#[from] LanguageError),
+}
+
+/// An error that occurrs when trying to assign an incompatible language to a parser.
+// Note: Implementing it this way allows us to keep `tree_sitter` out of the public API.
+//       More details: https://docs.rs/thiserror/latest/thiserror/
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct LanguageError(#[from] tree_sitter::LanguageError);
 
 /// An implementation of [`Extractor`] enables snippets to be extracted
 /// from a given unit of source code (typically a file).
@@ -76,6 +86,9 @@ pub trait Extractor {
     /// The source language supported by the implementation.
     type Language: Language;
 
+    /// The type used to iterate over extracted snippets.
+    type ExtractIterator: FallibleIterator<Item = Snippet<Self::Language>, Error = Error>;
+
     /// Reports the support status for extractor in regards to the provided unit of source code.
     ///
     /// # Reader
@@ -91,15 +104,8 @@ pub trait Extractor {
     ///
     /// If the reader was previously read (partially or fully, by example via [`Extractor::support`]),
     /// it almost definitely needs to be reset to the initial point before using this method.
-    fn extract<R: Read, I: ExtractIterator<Self::Language>>(source: R) -> I;
+    fn extract<R: Read>(source: R) -> Self::ExtractIterator;
 }
-
-/// Convenience type for a fallible iterator that generates snippets of the provided language.
-// It's not possible to type alias traits; instead we define a new trait that
-// depends on the base trait and then implement this new trait for anything
-// that implements the base trait.
-pub trait ExtractIterator<L>: FallibleIterator<Item = Snippet<L>, Error = Error> {}
-impl<L, I: FallibleIterator<Item = Snippet<L>, Error = Error>> ExtractIterator<L> for I {}
 
 /// Standardizes the description of languages supported by [`Extractor`] implementations.
 pub trait Language {

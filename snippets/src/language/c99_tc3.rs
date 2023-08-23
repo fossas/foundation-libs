@@ -28,7 +28,10 @@
 //! [`tree-sitter-c`]: https://github.com/tree-sitter/tree-sitter-c
 //! [`iso-9899-tc3`]: https://github.com/slebok/zoo/tree/master/zoo/c/c99/iso-9899-tc3
 
-use std::io::Read;
+use std::{io::Read, marker::PhantomData};
+
+use fallible_iterator::FallibleIterator;
+use typed_builder::TypedBuilder;
 
 use crate::impl_prelude::*;
 
@@ -43,18 +46,50 @@ impl SnippetLanguage for Language {
 }
 
 /// Supports extracting snippets from C99 TC3 source code.
-pub struct Extractor {}
+pub struct Extractor;
 
 impl SnippetExtractor for Extractor {
     type Support = Support;
 
     type Language = Language;
 
+    type ExtractIterator = SnippetExtractionIterator<Self::Language>;
+
     fn support<R: Read>(source: R) -> Result<Self::Support, ExtractorError> {
         todo!()
     }
 
-    fn extract<R: Read, I: ExtractIterator<Self::Language>>(source: R) -> I {
+    fn extract<R: Read>(source: R) -> Self::ExtractIterator {
+        SnippetExtractionIterator::builder()
+            .with_language(tree_sitter_c::language)
+            .build()
+    }
+}
+
+#[derive(TypedBuilder)]
+pub struct SnippetExtractionIterator<L> {
+    #[builder(default)]
+    language: PhantomData<L>,
+
+    #[builder(default_code = "tree_sitter::Parser::new()")]
+    parser: tree_sitter::Parser,
+
+    #[builder(setter(strip_option))]
+    with_language: Option<fn() -> tree_sitter::Language>,
+}
+
+impl<L> FallibleIterator for SnippetExtractionIterator<L> {
+    type Item = Snippet<L>;
+
+    type Error = ExtractorError;
+
+    fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(language) = self.with_language.take() {
+            if let Err(err) = self.parser.set_language(language()) {
+                return Err(LanguageError(err).into());
+            }
+        }
+
         todo!()
     }
 }
