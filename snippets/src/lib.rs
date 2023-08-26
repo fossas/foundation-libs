@@ -21,19 +21,28 @@
 //!
 //! (TODO)
 
-use std::{cmp::Ordering, io::Read, marker::PhantomData};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    marker::PhantomData,
+    ops::{Range, RangeInclusive},
+    str::Utf8Error,
+};
 
+use base64::Engine;
 use derivative::Derivative;
-use derive_more::{Deref, Index};
+use derive_more::{Constructor, Deref, From, Index};
 pub use fallible_iterator::FallibleIterator;
 use flagset::{flags, FlagSet};
 use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use sha2::{Digest, Sha256};
 use strum::{Display, EnumIter};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
+pub mod debugging;
 pub mod language;
 
 /// Convenience import for all types that
@@ -47,10 +56,10 @@ pub mod language;
 pub mod impl_prelude {
     pub use super::{
         Error as ExtractorError, Extractor as SnippetExtractor, Kind as SnippetKind,
-        Language as SnippetLanguage, LanguageError, Location as SnippetLocation,
-        Metadata as SnippetMetadata, Method as SnippetMethod, Snippet,
-        Strategy as LanguageStrategy, Support, Transform as SnippetTransform,
-        Transforms as SnippetTransforms,
+        Kinds as SnippetKinds, Language as SnippetLanguage, LanguageError,
+        Location as SnippetLocation, Metadata as SnippetMetadata, Method as SnippetMethod,
+        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy, Support,
+        Transform as SnippetTransform, Transforms as SnippetTransforms,
     };
 }
 
@@ -60,6 +69,15 @@ pub mod impl_prelude {
 pub enum Error {
     #[error("configure parser")]
     Configure(#[from] LanguageError),
+
+    #[error("read input as utf8")]
+    DecodeUTF8(#[from] Utf8Error),
+}
+
+impl From<tree_sitter::LanguageError> for Error {
+    fn from(err: tree_sitter::LanguageError) -> Self {
+        LanguageError(err).into()
+    }
 }
 
 /// An error that occurrs when trying to assign an incompatible language to a parser.
@@ -86,15 +104,16 @@ pub trait Extractor {
     /// The source language supported by the implementation.
     type Language: Language;
 
-    /// The type used to iterate over extracted snippets.
-    type ExtractIterator: FallibleIterator<Item = Snippet<Self::Language>, Error = Error>;
-
-    /// Reports the support status for extractor in regards to the provided unit of source code.
+    /// Reports the support status for extractor for the language of the provided source code.
+    ///
+    /// **Important:**
+    /// This only determines if the extractor _could support_ the given language,
+    /// not whether it will concretely result in actual parsed snippets.
     ///
     /// # Reader
     ///
     /// The [`Read`] instance provided to `source` may be partially or fully consumed during this process.
-    fn support<R: Read>(source: R) -> Result<Self::Support, Error>;
+    fn support(content: impl AsRef<[u8]>) -> Result<Self::Support, Error>;
 
     /// Reads the provided unit of source code for snippets, according to the provided options.
     ///
@@ -104,7 +123,101 @@ pub trait Extractor {
     ///
     /// If the reader was previously read (partially or fully, by example via [`Extractor::support`]),
     /// it almost definitely needs to be reset to the initial point before using this method.
-    fn extract<R: Read>(source: R) -> Self::ExtractIterator;
+    fn extract(
+        opts: &Options,
+        content: impl AsRef<[u8]>,
+    ) -> Result<Vec<Snippet<Self::Language>>, Error>;
+}
+
+/// Options for extracting snippets.
+/// Options are constructed via the `Options::builder` method.
+///
+/// By default, all kinds of snippet are extracted, and all normalizations are applied.
+/// Providing an empty set to [`Options::kinds`] is equivalent to the default set
+/// (namely, all [`Kind`]s).
+///
+/// All options implicitly assume [`Method::Raw`]; it is not currently possible to disable
+/// this snippet extraction method. This means that providing an empty set of transforms
+/// (via [`Transforms::none`]) results in a collection of snippets extracted with [`Method::Raw`].
+///
+/// # Examples
+///
+/// Defaults:
+/// ```
+/// # use snippets::*;
+/// let options = Options::default();
+///
+/// assert_eq!(options.kinds(), Kinds::full());
+/// assert_eq!(options.transforms(), Transforms::full());
+/// ```
+///
+/// Restricting the kinds of snippet extracted:
+/// ```
+/// # use snippets::*;
+/// let options = Options::new(Kind::Signature, Transforms::full());
+/// assert!(options.kinds().contains(Kind::Signature));
+/// assert!(!options.kinds().contains(Kind::Body));
+/// assert!(!options.kinds().contains(Kind::Full));
+/// ```
+///
+/// Restricting the transforms applied:
+/// ```
+/// # use snippets::*;
+/// let options = Options::new(Kinds::full(), Transform::Comment);
+/// assert!(options.transforms().contains(Transform::Comment));
+/// assert!(!options.transforms().contains(Transform::Space));
+/// ```
+///
+/// Only use [`Method::Raw`]:
+/// ```
+/// # use snippets::*;
+/// let options = Options::new(Kinds::full(), Transforms::none());
+/// assert!(options.transforms().is_empty());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, CopyGetters)]
+#[getset(get_copy = "pub")]
+pub struct Options {
+    /// The kinds of snippet to extract.
+    kinds: Kinds,
+
+    /// The normalizations used to extract this snippet.
+    transforms: Transforms,
+}
+
+impl Options {
+    /// Create a new set of options for a snippet extractor.
+    pub fn new(kinds: impl Into<Kinds>, transforms: impl Into<Transforms>) -> Self {
+        Self {
+            kinds: Self::non_empty_kinds(kinds),
+            transforms: transforms.into(),
+        }
+    }
+
+    /// Report the cartesian product of the configured [`Kind`]s of snippets to extract
+    /// with configured [`Method`]s to apply.
+    pub fn cartesian_product(&self) -> impl Iterator<Item = (Kind, Method)> {
+        self.kinds
+            .iter()
+            .cartesian_product(Method::iter(self.transforms))
+    }
+
+    fn non_empty_kinds(input: impl Into<Kinds>) -> Kinds {
+        let input = input.into();
+        if input.is_empty() {
+            Kinds::full()
+        } else {
+            input
+        }
+    }
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            kinds: Kinds::full(),
+            transforms: Transforms::full(),
+        }
+    }
 }
 
 /// Standardizes the description of languages supported by [`Extractor`] implementations.
@@ -167,18 +280,29 @@ pub struct Snippet<L> {
     #[getset(get_copy = "pub")]
     metadata: Metadata,
 
-    /// The raw bytes of the snippet content.
+    /// The bytes of the snippet fingerprint.
     #[index]
     #[deref]
     #[getset(get = "pub")]
     #[derivative(PartialOrd = "ignore", Ord = "ignore")]
-    bytes: Vec<u8>,
+    fingerprint: PrettyBuffer,
 
     /// Used to disambiguate snippets by source language.
     ///
     /// Technically this is evaluated for ordering and equality,
     /// but `PhantomData<T>` is always equal to itself for both checks.
     language: PhantomData<L>,
+}
+
+impl<L> Snippet<L> {
+    /// Create a new snippet from the provided data.
+    pub fn new(meta: Metadata, content: impl AsRef<[u8]>) -> Self {
+        Self {
+            fingerprint: generate_fingerprint(content),
+            metadata: meta,
+            language: PhantomData,
+        }
+    }
 }
 
 impl<L: Language> std::fmt::Display for Snippet<L> {
@@ -188,13 +312,13 @@ impl<L: Language> std::fmt::Display for Snippet<L> {
 }
 
 /// The metadata for an extracted snippet.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, CopyGetters)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, CopyGetters, Constructor)]
 #[getset(get_copy = "pub")]
 pub struct Metadata {
     /// The kind of item this snippet represents.
     kind: Kind,
 
-    /// The method used to generate this snippet.
+    /// The method used to extract this snippet.
     method: Method,
 
     /// The location at which the snippet was found.
@@ -249,11 +373,11 @@ impl std::fmt::Display for Metadata {
 #[getset(get_copy = "pub")]
 pub struct Location {
     /// The byte offset at which the snippet began.
-    #[builder(setter(transform = |input: u64| ByteOffset(input)))]
+    #[builder(setter(transform = |input: usize| ByteOffset(input)))]
     byte_offset: ByteOffset,
 
     /// The number of bytes to read for the snippet from the file.
-    #[builder(setter(transform = |input: u64| ByteLen(input)))]
+    #[builder(setter(transform = |input: usize| ByteLen(input)))]
     byte_len: ByteLen,
 }
 
@@ -264,12 +388,73 @@ impl std::fmt::Display for Location {
 }
 
 impl Location {
-    /// Read a [`Location`] as a range, intended to be used to index a `Vec<u8>` or `&[u8]`.
+    /// Read a [`Location`] as a range, intended to be used to index a buffer of bytes.
     pub fn as_range(&self) -> std::ops::RangeInclusive<usize> {
-        let len = self.byte_len.0 as usize;
-        let start = self.byte_offset.0 as usize;
+        let len = self.byte_len.0;
+        let start = self.byte_offset.0;
         let end = start + len;
         start..=end
+    }
+
+    /// Extract the bytes indicated by a [`Location`] from a buffer.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let example = "#include <stdio.h>  int main() {}";
+    /// let location = Location::builder().byte_offset(20).byte_len(9).build();
+    ///
+    /// let got = location.extract_from(example.as_bytes());
+    /// assert_eq!(got, b"int main()");
+    /// ```
+    pub fn extract_from<'a>(&self, buf: &'a [u8]) -> &'a [u8] {
+        let start = self.byte_offset.0;
+        let end = self.byte_offset.0 + self.byte_len.0;
+        &buf[start..=end]
+    }
+
+    /// Extract the bytes indicated by a [`Location`] from a buffer,
+    /// into a lossily converted [`String`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let example = "#include <stdio.h>  int main() {}";
+    /// let location = Location::builder().byte_offset(20).byte_len(9).build();
+    ///
+    /// let got = location.extract_from_lossy(example.as_bytes());
+    /// assert_eq!(got, "int main()");
+    /// ```
+    pub fn extract_from_lossy<'a>(&self, buf: &'a [u8]) -> Cow<'a, str> {
+        let bytes = self.extract_from(buf);
+        String::from_utf8_lossy(bytes)
+    }
+}
+
+impl From<Range<usize>> for Location {
+    fn from(value: Range<usize>) -> Self {
+        // `Location` is always inclusive, but what matters is the relative difference
+        // between start and end, not the concrete values, so ignore whether
+        // the input range is inclusive.
+        let start = value.start;
+        let end = value.end;
+        Self {
+            byte_offset: ByteOffset(start),
+            byte_len: ByteLen(end - start),
+        }
+    }
+}
+
+impl From<RangeInclusive<usize>> for Location {
+    fn from(value: RangeInclusive<usize>) -> Self {
+        let start = *value.start();
+        let end = *value.end();
+        Self {
+            byte_offset: ByteOffset(start),
+            byte_len: ByteLen(end - start),
+        }
     }
 }
 
@@ -281,64 +466,160 @@ impl Location {
 /// Think of the offset as
 /// "the number of bytes to skip from the start of the file to when this snippet begins".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
-pub struct ByteOffset(u64);
+pub struct ByteOffset(usize);
 
 /// The number of bytes to read for the snippet from the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
-pub struct ByteLen(u64);
+pub struct ByteLen(usize);
 
-/// The kind of item this snippet represents.
-///
-/// # Specificity order
-///
-/// Specificity is in the order specified by the implementation of [`Ord`] for this type,
-/// meaning that a [`Kind::Full`] variant is considered a more exact match
-/// than a [`Kind::Body`] variant, which is a more exact match
-/// than a [`Kind::Signature`] variant.
-///
-/// Items with higher "specificity order" are sorted _higher_; meaning that a
-/// [`Kind::Full`] variant would be sorted later in a vector
-/// than a [`Kind::Signature`] variant:
-///
-/// ```
-/// # use snippets::*;
-/// assert!(Kind::Full > Kind::Body);
-/// assert!(Kind::Body > Kind::Signature);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, EnumIter, Display)]
-#[strum(serialize_all = "snake_case")]
-#[non_exhaustive]
-pub enum Kind {
-    /// The signature of the function.
+flags! {
+    /// The kind of item this snippet represents.
     ///
-    /// ```ignore
-    /// fn say_happy_birthday(age: usize) -> String            // <- included
-    /// {                                                      // <- omitted
-    ///   println!("Happy birthday! You're {age} years old!"); // <- omitted
-    /// }                                                      // <- omitted
+    /// # Specificity order
+    ///
+    /// Specificity is in the order specified by the implementation of [`Ord`] for this type,
+    /// meaning that a [`Kind::Full`] variant is considered a more exact match
+    /// than a [`Kind::Body`] variant, which is a more exact match
+    /// than a [`Kind::Signature`] variant.
+    ///
+    /// Items with higher "specificity order" are sorted _higher_; meaning that a
+    /// [`Kind::Full`] variant would be sorted later in a vector
+    /// than a [`Kind::Signature`] variant:
+    ///
     /// ```
-    Signature,
+    /// # use snippets::*;
+    /// assert!(Kind::Full > Kind::Body);
+    /// assert!(Kind::Body > Kind::Signature);
+    /// ```
+    #[derive(Hash, PartialOrd, Ord, EnumIter, Display)]
+    #[strum(serialize_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum Kind: u8 {
+        /// The signature of the function.
+        ///
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String            // <- included
+        /// {                                                      // <- omitted
+        ///   println!("Happy birthday! You're {age} years old!"); // <- omitted
+        /// }                                                      // <- omitted
+        /// ```
+        Signature,
 
-    /// The body of the function.
-    ///
-    /// ```ignore
-    /// fn say_happy_birthday(age: usize) -> String {          // <- omitted
-    ///   println!("Happy birthday! You're {age} years old!"); // <- included
-    /// }                                                      // <- omitted
-    /// ```
-    Body,
+        /// The body of the function.
+        ///
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String {          // <- omitted
+        ///   println!("Happy birthday! You're {age} years old!"); // <- included
+        /// }                                                      // <- omitted
+        /// ```
+        Body,
 
-    /// Both signature and body.
-    ///
-    /// ```ignore
-    /// fn say_happy_birthday(age: usize) -> String {          // <- included
-    ///   println!("Happy birthday! You're {age} years old!"); // <- included
-    /// }                                                      // <- included
-    /// ```
-    Full,
+        /// Both signature and body.
+        ///
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String {          // <- included
+        ///   println!("Happy birthday! You're {age} years old!"); // <- included
+        /// }                                                      // <- included
+        /// ```
+        Full,
+    }
 }
 
-/// The method used to generate this snippet.
+/// The kinds of snippet to extract.
+///
+/// # Examples
+///
+/// Single [`Kind`] in the set:
+/// ```
+/// # use snippets::*;
+/// let kinds = Kinds::from(Kind::Signature);
+/// assert!(kinds.contains(Kind::Signature));
+/// ```
+///
+/// Multiple [`Kind`]s in the set:
+/// ```
+/// # use snippets::*;
+/// let kinds = Kinds::from(Kind::Signature | Kind::Body);
+/// assert!(kinds.contains(Kind::Signature));
+/// assert!(kinds.contains(Kind::Body));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Kinds(FlagSet<Kind>);
+
+impl Kinds {
+    /// Check whether a given [`Kind`] is in the set.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let kinds = Kinds::from(Kind::Signature | Kind::Body);
+    /// assert!(kinds.contains(Kind::Signature));
+    /// assert!(kinds.contains(Kind::Body));
+    /// ```
+    pub fn contains(&self, kind: Kind) -> bool {
+        self.0.contains(kind)
+    }
+
+    /// Check whether the set is empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let kinds = Kinds::from(Kind::Signature | Kind::Body);
+    /// assert!(!kinds.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Create a new set of all [`Kind`]s.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let kinds = Kinds::full();
+    /// assert!(kinds.contains(Kind::Signature));
+    /// assert!(kinds.contains(Kind::Body));
+    /// ```
+    pub fn full() -> Self {
+        Self(FlagSet::full())
+    }
+
+    /// Iterate over the [`Kind`]s in the set.
+    pub fn iter(&self) -> impl Iterator<Item = Kind> + Clone {
+        self.0.into_iter()
+    }
+}
+
+impl From<FlagSet<Kind>> for Kinds {
+    fn from(value: FlagSet<Kind>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Kind> for Kinds {
+    fn from(value: Kind) -> Self {
+        Self(value.into())
+    }
+}
+
+impl std::fmt::Display for Kinds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let kinds = self
+            .0
+            .into_iter()
+            .sorted_unstable()
+            .map(|t| t.to_string())
+            .collect_vec()
+            .join(",");
+        write!(f, "{kinds}")
+    }
+}
+
+/// The method used to extract this snippet.
 ///
 /// # Specificity order
 ///
@@ -372,6 +653,24 @@ pub enum Method {
     Raw,
 }
 
+impl Method {
+    /// Create an iterator over possible methods to use for snippet extraction,
+    /// given the provided [`Transforms`].
+    ///
+    /// If the provided set is empty, this is equivalent to [`std::iter::once`] over [`Method::Raw`].
+    pub fn iter(transforms: Transforms) -> impl Iterator<Item = Method> + Clone {
+        // Implement with `Vec` so that the types for each branch line up.
+        // Since each branch uses a macro to construct an appropriately-sized `Vec`,
+        // this is no worse performance than e.g. `iter::once().chain(iter::once())`.
+        if transforms.is_empty() {
+            vec![Method::Raw]
+        } else {
+            vec![Method::Raw, Method::Normalized(transforms)]
+        }
+        .into_iter()
+    }
+}
+
 impl std::fmt::Display for Method {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -382,7 +681,7 @@ impl std::fmt::Display for Method {
 }
 
 flags! {
-    /// The normalization used to generate this snippet.
+    /// The normalization used to extract this snippet.
     ///
     /// # Specificity order
     ///
@@ -464,7 +763,7 @@ impl Transform {
     }
 }
 
-/// The normalizations used to generate this snippet.
+/// The normalizations used to extract this snippet.
 ///
 /// # Specificity order
 ///
@@ -517,6 +816,61 @@ impl Transforms {
             .map(Transform::score)
             .fold((0, 0), |(prev, len), score| (prev + score, len + 1))
     }
+
+    /// Check whether a given [`Transform`] is in the set.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let transforms = Transforms::from(Transform::Space | Transform::Comment);
+    /// assert!(transforms.contains(Transform::Space));
+    /// assert!(transforms.contains(Transform::Comment));
+    /// ```
+    pub fn contains(&self, transform: Transform) -> bool {
+        self.0.contains(transform)
+    }
+
+    /// Check whether the set is empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let transforms = Transforms::from(Transform::Space | Transform::Comment);
+    /// assert!(!transforms.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Create a new set of all [`Transform`]s.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let transforms = Transforms::full();
+    /// assert!(transforms.contains(Transform::Space));
+    /// assert!(transforms.contains(Transform::Comment));
+    /// ```
+    pub fn full() -> Self {
+        Self(FlagSet::full())
+    }
+
+    /// Create a new set with no [`Transform`]s.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let transforms = Transforms::none();
+    /// assert!(!transforms.contains(Transform::Space));
+    /// assert!(!transforms.contains(Transform::Comment));
+    /// ```
+    pub fn none() -> Self {
+        Self(FlagSet::default())
+    }
 }
 
 impl std::fmt::Display for Transforms {
@@ -563,6 +917,36 @@ impl From<Transform> for Transforms {
     fn from(value: Transform) -> Self {
         Self(value.into())
     }
+}
+
+/// A byte buffer that reports its base64 value when displayed.
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, From)]
+pub struct PrettyBuffer(Vec<u8>);
+
+impl std::fmt::Debug for PrettyBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let repr = as_base64(&self.0);
+        f.write_fmt(format_args!("PrettyBuffer({repr})"))
+    }
+}
+
+impl std::fmt::Display for PrettyBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let repr = as_base64(&self.0);
+        f.write_fmt(format_args!("{repr}"))
+    }
+}
+
+/// Given a buffer, produce a fingerprint of its contents.
+fn generate_fingerprint(input: impl AsRef<[u8]>) -> PrettyBuffer {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_ref());
+    hasher.finalize().as_slice().to_vec().into()
+}
+
+/// Given a buffer, produce a base64 representation of its contents.
+fn as_base64(input: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD_NO_PAD.encode(input)
 }
 
 #[cfg(test)]
@@ -648,5 +1032,30 @@ mod tests {
             let (score, _) = Transforms(set).score_count();
             assert_eq!(score, expected, "set: {set:?}");
         }
+    }
+
+    #[test]
+    fn location_round_trip() {
+        let location = Location {
+            byte_offset: ByteOffset(20),
+            byte_len: ByteLen(10),
+        };
+        let inclusive_range = 20..=30;
+        let range = 20..30;
+
+        assert_eq!(location.as_range(), inclusive_range);
+        assert_eq!(Location::from(inclusive_range), location);
+        assert_eq!(Location::from(range), location);
+    }
+
+    #[test]
+    fn location_extract() {
+        let input = "0123456789helloworld0123456789";
+        let location = Location {
+            byte_offset: ByteOffset(10),
+            byte_len: ByteLen(10),
+        };
+
+        assert_eq!(location.extract_from(input.as_bytes()), b"helloworld");
     }
 }

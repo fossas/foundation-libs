@@ -10,6 +10,8 @@ members = [
   "vsi",
 ]
 
+resolver = "2"
+
 [profile.dev.package.backtrace]
 opt-level = 3
 
