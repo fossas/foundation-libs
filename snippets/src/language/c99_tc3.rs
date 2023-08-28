@@ -29,13 +29,13 @@
 //! [`iso-9899-tc3`]: https://github.com/slebok/zoo/tree/master/zoo/c/c99/iso-9899-tc3
 
 use itertools::Itertools;
-use tap::Pipe;
+use tap::{Pipe, Tap};
 use tracing::{debug, warn};
 use tree_sitter::Node;
 use tree_sitter_traversal::{traverse_tree, Order};
 
 use crate::debugging::ToDisplayEscaped;
-use crate::impl_prelude::*;
+use crate::{impl_language, impl_prelude::*};
 
 /// This module implements support for C99 TC3.
 ///
@@ -46,6 +46,8 @@ impl SnippetLanguage for Language {
     const NAME: &'static str = "c99_tc3";
     const STRATEGY: LanguageStrategy = LanguageStrategy::Static;
 }
+
+impl_language!(Language);
 
 /// Supports extracting snippets from C99 TC3 source code.
 pub struct Extractor;
@@ -66,7 +68,7 @@ impl SnippetExtractor for Extractor {
         }
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(kinds = %opts.kinds(), transforms = %opts.transforms(), content_len = content.as_ref().len()))]
     fn extract(
         opts: &SnippetOptions,
         content: impl AsRef<[u8]>,
@@ -86,7 +88,7 @@ impl SnippetExtractor for Extractor {
             //
             // Reference:
             // https://tree-sitter.github.io/tree-sitter/using-parsers#named-vs-anonymous-nodes
-            .filter(|node| !node.is_named())
+            .filter(|node| node.is_named())
             // Metadata is used further in the pipeline.
             .map(|node| (node, SnippetLocation::from(node.byte_range())))
             // Always write the debug line, regardless of the kind of node.
@@ -110,22 +112,33 @@ impl SnippetExtractor for Extractor {
     }
 }
 
-#[tracing::instrument(skip_all, fields(kind = ?meta.kind(), method = ?meta.method(), loc = ?meta.location()))]
-fn extract_one<'a, L>(meta: SnippetMetadata, _node: Node<'a>, content: &'a [u8]) -> Snippet<L> {
-    let raw = meta.location().extract_from(content);
-    debug!("raw: '{}'", raw.display_escaped());
+#[tracing::instrument(skip_all, fields(kind = %meta.kind(), method = %meta.method(), loc = %meta.location(), content_len = content.len()))]
+fn extract_one<'a, L>(meta: SnippetMetadata, node: Node<'a>, content: &'a [u8]) -> Snippet<L> {
+    // Extract the highlighted function from the broader content.
+    meta.location()
+        .extract_from(content)
+        .tap(|raw| debug!(raw = %raw.display_escaped()))
+        // "context" is the function after having been selected for "kind".
+        .pipe(|raw| extract_context(&meta, &node, raw))
+        .tap(|context| debug!(context = %context.display_escaped()))
+        // "text" is the function after transforms (if any).
+        .pipe(|context| extract_text(&meta, &node, context))
+        .tap(|text| debug!(text = %text.display_escaped()))
+        // Finally, construct the fingerprint itself.
+        .pipe(|text| Snippet::from(meta, text))
+        .tap(|snippet| debug!(fingerprint = %snippet.fingerprint()))
+}
 
-    let context = match meta.kind() {
-        SnippetKind::Full => raw,
+fn extract_context<'a>(meta: &SnippetMetadata, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+    match meta.kind() {
+        SnippetKind::Full => content,
         kind => unimplemented!("kind: {kind:?}"),
-    };
-    debug!("context: '{}'", context.display_escaped());
+    }
+}
 
-    let snippet = match meta.method() {
-        SnippetMethod::Raw => context,
+fn extract_text<'a>(meta: &SnippetMetadata, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+    match meta.method() {
+        SnippetMethod::Raw => content,
         method => unimplemented!("method: {method:?}"),
-    };
-
-    debug!("snippet: '{}'", snippet.display_escaped());
-    Snippet::new(meta, snippet)
+    }
 }

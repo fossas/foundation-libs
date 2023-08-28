@@ -39,6 +39,7 @@ use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use sha2::{Digest, Sha256};
 use strum::{Display, EnumIter};
+use tap::Pipe;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -221,6 +222,42 @@ impl Default for Options {
 }
 
 /// Standardizes the description of languages supported by [`Extractor`] implementations.
+///
+/// Note: [`impl_language!`] is available for convenience trait implementations if desired.
+///
+/// # Example
+///
+/// ```
+/// use snippets::Language;
+///
+/// pub struct CustomLanguage;
+///
+/// impl Language for CustomLanguage {
+///     const NAME: &'static str = "example";
+///     const STRATEGY: snippets::Strategy = snippets::Strategy::Static;
+/// }
+///
+/// assert_eq!(&format!("{}", CustomLanguage::display()), "example/static");
+/// ```
+///
+/// # Customization
+///
+/// ```
+/// use snippets::Language;
+///
+/// pub struct CustomLanguage;
+///
+/// impl Language for CustomLanguage {
+///     const NAME: &'static str = "example";
+///     const STRATEGY: snippets::Strategy = snippets::Strategy::Static;
+///
+///     fn display() -> &'static str {
+///         "custom name"
+///     }
+/// }
+///
+/// assert_eq!(&format!("{}", CustomLanguage::display()), "custom name");
+/// ```
 pub trait Language {
     /// The name of the language.
     const NAME: &'static str;
@@ -233,6 +270,92 @@ pub trait Language {
         static DISPLAY: OnceCell<String> = OnceCell::new();
         DISPLAY.get_or_init(|| format!("{}/{}", Self::NAME, Self::STRATEGY))
     }
+}
+
+/// Convenience macro to implement standard traits for a [`Language`].
+///
+/// This library cannot auto implement debug implementations because
+/// they may be foreign types for a foreign trait.
+///
+/// Trait | Default | Description
+/// --- | --- | ---
+/// `Debug` | Yes | Implement `std::fmt::Debug` with the same text as `Self::display()`.
+/// `Display` | Yes | Implement `std::fmt::Display` with the same text as `Self::display()`.
+///
+/// Implement all "default" traits in the table above by calling this macro
+/// with only the type name as an argument:
+/// ```ignore
+/// impl_language!(CustomLanguage);
+/// ```
+///
+/// Implement a subset of traits by calling this macro with the type and trait:
+/// ```ignore
+/// impl_language!(CustomLanguage => Debug);
+/// ```
+///
+/// Only traits in the table above are supported at all.
+///
+/// # Example
+///
+/// ```
+/// use snippets::{impl_language, Language};
+///
+/// pub struct CustomLanguage;
+///
+/// impl Language for CustomLanguage {
+///     const NAME: &'static str = "example";
+///     const STRATEGY: snippets::Strategy = snippets::Strategy::Static;
+/// }
+///
+/// impl_language!(CustomLanguage);
+///
+/// assert_eq!(format!("{}", CustomLanguage), format!("{}", CustomLanguage::display()));
+/// assert_eq!(format!("{:?}", CustomLanguage), format!("{}", CustomLanguage));
+/// ```
+///
+/// # Customization
+///
+/// Users may still customize the display of a language:
+/// ```
+/// use snippets::{impl_language, Language};
+///
+/// pub struct CustomLanguage;
+///
+/// impl Language for CustomLanguage {
+///     const NAME: &'static str = "example";
+///     const STRATEGY: snippets::Strategy = snippets::Strategy::Static;
+///
+///     fn display() -> &'static str {
+///         "custom name"
+///     }
+/// }
+///
+/// impl_language!(CustomLanguage);
+///
+/// assert_eq!(&format!("{}", CustomLanguage), "custom name");
+/// assert_eq!(&format!("{:?}", CustomLanguage), "custom name");
+/// ```
+#[macro_export]
+macro_rules! impl_language {
+    ($language:ty => Debug) => {
+        impl std::fmt::Debug for $language {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", <Self as $crate::Language>::display())
+            }
+        }
+    };
+    ($language:ty => Display) => {
+        impl std::fmt::Display for $language {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", <Self as $crate::Language>::display())
+            }
+        }
+    };
+    ($language:ty) => {
+        $crate::impl_language!($language => Display);
+        $crate::impl_language!($language => Debug);
+    };
+
 }
 
 /// Many programming languages include compile-time metaprogramming,
@@ -296,10 +419,15 @@ pub struct Snippet<L> {
 
 impl<L> Snippet<L> {
     /// Create a new snippet from the provided data.
-    pub fn new(meta: Metadata, content: impl AsRef<[u8]>) -> Self {
+    pub fn from(meta: Metadata, content: impl AsRef<[u8]>) -> Self {
+        generate_fingerprint(&content).pipe(|fp| Self::new(meta, fp))
+    }
+
+    /// Create a new instance from the provided information.
+    pub fn new(metadata: Metadata, fingerprint: PrettyBuffer) -> Self {
         Self {
-            fingerprint: generate_fingerprint(content),
-            metadata: meta,
+            metadata,
+            fingerprint,
             language: PhantomData,
         }
     }
@@ -360,7 +488,7 @@ impl std::fmt::Display for Metadata {
 /// # // ⏎ is a multi-byte symbol, so use an empty space for demonstration instead.
 /// # let example = "#include <stdio.h>  int main() {}";
 /// # use snippets::*;
-/// let location = Location::builder().byte_offset(20).byte_len(9).build();
+/// let location = Location::builder().byte_offset(20).byte_len(10).build();
 ///
 /// let range = location.as_range();
 /// let snippet = &example.as_bytes()[range];
@@ -389,11 +517,26 @@ impl std::fmt::Display for Location {
 
 impl Location {
     /// Read a [`Location`] as a range, intended to be used to index a buffer of bytes.
-    pub fn as_range(&self) -> std::ops::RangeInclusive<usize> {
-        let len = self.byte_len.0;
+    pub fn as_range(&self) -> std::ops::Range<usize> {
         let start = self.byte_offset.0;
+        let len = self.byte_len.0;
         let end = start + len;
-        start..=end
+        start..end
+    }
+
+    /// The index of the first byte indicated for the provided location.
+    pub fn start_byte(&self) -> usize {
+        self.as_range().start
+    }
+
+    /// The index of the last byte indicated for the provided location.
+    pub fn end_byte(&self) -> usize {
+        let end = self.as_range().end;
+        if end == 0 {
+            0
+        } else {
+            end - 1 // as_range is not inclusive, so the last byte _to be read_ is less one.
+        }
     }
 
     /// Extract the bytes indicated by a [`Location`] from a buffer.
@@ -403,15 +546,13 @@ impl Location {
     /// ```
     /// # use snippets::*;
     /// let example = "#include <stdio.h>  int main() {}";
-    /// let location = Location::builder().byte_offset(20).byte_len(9).build();
+    /// let location = Location::builder().byte_offset(20).byte_len(10).build();
     ///
     /// let got = location.extract_from(example.as_bytes());
     /// assert_eq!(got, b"int main()");
     /// ```
     pub fn extract_from<'a>(&self, buf: &'a [u8]) -> &'a [u8] {
-        let start = self.byte_offset.0;
-        let end = self.byte_offset.0 + self.byte_len.0;
-        &buf[start..=end]
+        &buf[self.as_range()]
     }
 
     /// Extract the bytes indicated by a [`Location`] from a buffer,
@@ -422,7 +563,7 @@ impl Location {
     /// ```
     /// # use snippets::*;
     /// let example = "#include <stdio.h>  int main() {}";
-    /// let location = Location::builder().byte_offset(20).byte_len(9).build();
+    /// let location = Location::builder().byte_offset(20).byte_len(10).build();
     ///
     /// let got = location.extract_from_lossy(example.as_bytes());
     /// assert_eq!(got, "int main()");
@@ -435,9 +576,6 @@ impl Location {
 
 impl From<Range<usize>> for Location {
     fn from(value: Range<usize>) -> Self {
-        // `Location` is always inclusive, but what matters is the relative difference
-        // between start and end, not the concrete values, so ignore whether
-        // the input range is inclusive.
         let start = value.start;
         let end = value.end;
         Self {
@@ -450,7 +588,7 @@ impl From<Range<usize>> for Location {
 impl From<RangeInclusive<usize>> for Location {
     fn from(value: RangeInclusive<usize>) -> Self {
         let start = *value.start();
-        let end = *value.end();
+        let end = *value.end() + 1;
         Self {
             byte_offset: ByteOffset(start),
             byte_len: ByteLen(end - start),
@@ -609,8 +747,7 @@ impl From<Kind> for Kinds {
 impl std::fmt::Display for Kinds {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let kinds = self
-            .0
-            .into_iter()
+            .iter()
             .sorted_unstable()
             .map(|t| t.to_string())
             .collect_vec()
@@ -871,13 +1008,17 @@ impl Transforms {
     pub fn none() -> Self {
         Self(FlagSet::default())
     }
+
+    /// Iterate over the [`Transform`]s in the set.
+    pub fn iter(&self) -> impl Iterator<Item = Transform> + Clone {
+        self.0.into_iter()
+    }
 }
 
 impl std::fmt::Display for Transforms {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let transforms = self
-            .0
-            .into_iter()
+            .iter()
             .sorted_unstable()
             .map(|t| t.to_string())
             .collect_vec()
@@ -919,9 +1060,37 @@ impl From<Transform> for Transforms {
     }
 }
 
+/// Errors reported when decoding a buffer.
+#[derive(Debug, Error)]
+pub enum BufferError {
+    #[error("decode base64 input")]
+    DecodeBase64(#[from] DecodeBase64Error),
+}
+
+/// An error that occurrs when trying to decode into a buffer.
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct DecodeBase64Error(#[from] base64::DecodeError);
+
+impl From<base64::DecodeError> for BufferError {
+    fn from(value: base64::DecodeError) -> Self {
+        Self::DecodeBase64(DecodeBase64Error(value))
+    }
+}
+
 /// A byte buffer that reports its base64 value when displayed.
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, From)]
 pub struct PrettyBuffer(Vec<u8>);
+
+impl PrettyBuffer {
+    /// Read a base64 string into an instance.
+    pub fn new_base64(input: impl AsRef<[u8]>) -> Result<Self, BufferError> {
+        base64::engine::general_purpose::STANDARD_NO_PAD
+            .decode(input.as_ref())
+            .map_err(BufferError::from)
+            .map(Self)
+    }
+}
 
 impl std::fmt::Debug for PrettyBuffer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -998,7 +1167,7 @@ mod tests {
     #[test]
     fn slice_offset() -> Result<(), std::str::Utf8Error> {
         let example = "#include <stdio.h>  int main() {}";
-        let location = Location::builder().byte_offset(20).byte_len(9).build();
+        let location = Location::builder().byte_offset(20).byte_len(10).build();
 
         let range = location.as_range();
         let snippet = &example.as_bytes()[range];
@@ -1040,17 +1209,51 @@ mod tests {
             byte_offset: ByteOffset(20),
             byte_len: ByteLen(10),
         };
-        let inclusive_range = 20..=30;
+        let inclusive_range = 20..=29;
         let range = 20..30;
 
-        assert_eq!(location.as_range(), inclusive_range);
+        assert_eq!(location.as_range(), range);
         assert_eq!(Location::from(inclusive_range), location);
         assert_eq!(Location::from(range), location);
     }
 
     #[test]
+    fn location_bytes_round_trip() {
+        let location = Location {
+            byte_offset: ByteOffset(10),
+            byte_len: ByteLen(10),
+        };
+
+        let input = "0123456789helloworld_abcdefghijk";
+        assert_eq!(location.extract_from(input.as_bytes()), b"helloworld");
+
+        let range = location.start_byte()..=location.end_byte();
+        let roundtrip = Location::from(range);
+        assert_eq!(roundtrip, location);
+        assert_eq!(roundtrip.extract_from(input.as_bytes()), b"helloworld");
+
+        let range = location.as_range();
+        let roundtrip = Location::from(range);
+        assert_eq!(roundtrip, location);
+        assert_eq!(roundtrip.extract_from(input.as_bytes()), b"helloworld");
+    }
+
+    #[test]
     fn location_extract() {
         let input = "0123456789helloworld0123456789";
+        let location = Location {
+            byte_offset: ByteOffset(10),
+            byte_len: ByteLen(10),
+        };
+
+        assert_eq!(location.extract_from(input.as_bytes()), b"helloworld");
+        assert_eq!(location.start_byte(), 10);
+        assert_eq!(location.end_byte(), 19);
+    }
+
+    #[test]
+    fn location_extract_end() {
+        let input = "0123456789helloworld";
         let location = Location {
             byte_offset: ByteOffset(10),
             byte_len: ByteLen(10),

@@ -31,3 +31,4 @@ tree-sitter-traversal = "0.1.2"
 typed-builder = "0.15.2"
 
 [dev-dependencies]
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
