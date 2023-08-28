@@ -1,0 +1,25 @@
+[package]
+name = "snippets"
+version = "0.1.0"
+edition = "2021"
+description = "Provides a framework and implementations for extracting snippets of programming languages from files"
+
+[features]
+default = []
+
+all-languages = ["c", "cpp"]
+c = []
+cpp = []
+
+[dependencies]
+derivative = "2.2.0"
+derive_more = "0.99.17"
+fallible-iterator = { version = "0.3.0", features = ["std"] }
+flagset = "0.4.3"
+getset = "0.1.2"
+strum = { version = "0.25.0", features = ["derive"] }
+thiserror = "1.0.47"
+typed-builder = "0.15.2"
+
+[dev-dependencies]
+itertools = "0.11.0"
