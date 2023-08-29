@@ -7,9 +7,13 @@ description = "Provides a framework and implementations for extracting snippets 
 [features]
 default = []
 
-all-languages = ["c", "cpp"]
-c = []
-cpp = []
+# Enables hardware acceleration for SHA2
+sha2-asm = ["sha2/asm"]
+
+# Enables support for each named language.
+# For more info, see the module documentation for the language.
+lang-all = ["lang-c99-tc3"]
+lang-c99-tc3 = []
 
 [dependencies]
 base64 = "0.21.2"
@@ -20,7 +24,7 @@ flagset = "0.4.3"
 getset = "0.1.2"
 itertools = "0.11.0"
 once_cell = "1.18.0"
-sha2 = { version = "0.10.7", features = ["asm", "asm-aarch64"] }
+sha2 = "0.10.7"
 strum = { version = "0.25.0", features = ["derive"] }
 tap = "1.0.1"
 thiserror = "1.0.47"
@@ -32,3 +36,4 @@ typed-builder = "0.15.2"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+snippets = { path = ".", features = ["lang-all"] }

@@ -9,17 +9,14 @@
 //! # Feature flags
 //!
 //! The main library, which enables consumers to plug their own implementations, is available by default.
-//! Features are most commonly used to enable support for languages.
+//! Features are most commonly used to enable support for languages,
+//! but other kinds of flags exist; see the table below for details.
 //!
 //! Name | Description | Kind
 //! ---|---|---
-//! `all-languages` | Enables all features that are of the kind "Language" | Language
-//! `c` | Enables support for C | Language
-//! `cpp` | Enables support for C++ | Language
-//!
-//! # Examples
-//!
-//! (TODO)
+//! `lang-all` | Enables all features that are of the kind "Language" | Language
+//! `lang-c99-tc3` | Enables support for C99 TC3 | Language
+//! `sha2-asm` | Enables hardware acceleration for SHA2 | Performance
 
 use std::{
     borrow::Cow,
