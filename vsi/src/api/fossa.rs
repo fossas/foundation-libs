@@ -241,6 +241,6 @@ impl super::Client for Fossa {
         let req = self.client.get(url.clone()).bearer_auth(&self.api_key);
         let res_body = run_req!(download, req, url);
         let ResBody { locators } = parse!(res_body)?;
-        Ok(HashSet::from_iter(locators.into_iter()))
+        Ok(HashSet::from_iter(locators))
     }
 }

@@ -134,7 +134,7 @@ impl Locator {
     pub fn parse(locator: &str) -> Result<Self, Error> {
         lazy_static! {
             static ref RE: Regex = Regex::new(
-                r#"^(?:(?P<fetcher>[a-z-]+)\+|)(?P<project>[^$]+)(?:\$|)(?P<revision>.+|)$"#
+                r"^(?:(?P<fetcher>[a-z-]+)\+|)(?P<project>[^$]+)(?:\$|)(?P<revision>.+|)$"
             )
             .expect("Locator parsing expression must compile");
         }
@@ -430,7 +430,7 @@ pub enum ProjectParseError {
 /// Optionally parse an org ID and trimmed project out of a project string.
 fn parse_org_project(project: &str) -> Result<(Option<usize>, &str), ProjectParseError> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r#"^(?:(?P<org_id>\d+)/)?(?P<project>.+)"#)
+        static ref RE: Regex = Regex::new(r"^(?:(?P<org_id>\d+)/)?(?P<project>.+)")
             .expect("Project parsing expression must compile");
     }
 
