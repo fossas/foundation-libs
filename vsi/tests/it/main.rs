@@ -47,7 +47,9 @@ async fn dry_run_fingerprint() -> Result<()> {
     let expected_stripped = include_str!("testdata/facebook-folly-Version.cpp.stripped");
 
     let (fp_raw, processed_raw) = processed.raw().to_owned();
-    let Some((fp_stripped, processed_stripped)) = processed.comment_stripped().to_owned() else { panic!("must have comment stripped") };
+    let Some((fp_stripped, processed_stripped)) = processed.comment_stripped().to_owned() else {
+        panic!("must have comment stripped")
+    };
 
     // Assert contents were processed correctly.
     assert!(!processed.detected_as_binary());

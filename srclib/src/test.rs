@@ -71,7 +71,9 @@ fn parse_with_org() {
 
     for (fetcher, org, project, revision) in izip!(fetchers, orgs, projects, revisions) {
         let input = format!("{fetcher}+{org}/{project}{revision}");
-        let Ok(parsed) = Locator::parse(&input) else { panic!("must parse '{input}'") };
+        let Ok(parsed) = Locator::parse(&input) else {
+            panic!("must parse '{input}'")
+        };
 
         assert_eq!(
             parsed.fetcher().to_string(),
