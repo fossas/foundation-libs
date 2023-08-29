@@ -87,7 +87,7 @@ impl SnippetExtractor for Extractor {
                     warn!(
                         %location,
                         content = %location.extract_from(content).display_escaped(),
-                        kind = "syntax_error",
+                        kind = %"syntax_error",
                         line_start = start.row,
                         line_end = end.row,
                         col_start = start.column,
@@ -97,7 +97,7 @@ impl SnippetExtractor for Extractor {
                     debug!(
                         %location,
                         content = %location.extract_from(content).display_escaped(),
-                        kind = node.kind(),
+                        kind = %node.kind(),
                     );
                 }
             })
