@@ -53,8 +53,6 @@ impl_language!(Language);
 pub struct Extractor;
 
 impl SnippetExtractor for Extractor {
-    type Support = Support;
-
     type Language = Language;
 
     #[tracing::instrument(skip_all, fields(kinds = %opts.kinds(), transforms = %opts.transforms(), content_len = content.as_ref().len()))]

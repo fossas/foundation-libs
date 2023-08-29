@@ -59,7 +59,7 @@ pub mod impl_prelude {
         Error as ExtractorError, Extractor as SnippetExtractor, Kind as SnippetKind,
         Kinds as SnippetKinds, Language as SnippetLanguage, LanguageError,
         Location as SnippetLocation, Metadata as SnippetMetadata, Method as SnippetMethod,
-        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy, Support,
+        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy,
         Transform as SnippetTransform, Transforms as SnippetTransforms,
     };
 }
@@ -91,17 +91,6 @@ pub struct LanguageError(#[from] tree_sitter::LanguageError);
 /// An implementation of [`Extractor`] enables snippets to be extracted
 /// from a given unit of source code (typically a file).
 pub trait Extractor {
-    /// When the extractor implementation reports its support for a given code unit,
-    /// this is the type that is reported.
-    ///
-    /// This is implemented as an associated type so that extractors
-    /// are able to provide their own support states.
-    ///
-    /// However most extractors are encouraged to use the standard [`Support`] type if possible,
-    /// and indeed the custom type must be able to translate to the standard type
-    /// in order to work with the rest of the library.
-    type Support: Into<Support>;
-
     /// The source language supported by the implementation.
     type Language: Language;
 
@@ -365,23 +354,6 @@ pub enum Strategy {
     /// The extractor statically analyzes the code.
     /// No compile time metaprogramming is evaluated.
     Static,
-}
-
-/// An implementation of [`Extractor`] may support source code to varying extent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
-#[strum(serialize_all = "snake_case")]
-#[non_exhaustive]
-pub enum Support {
-    /// The [`Extractor`] implementation fully supports the provided unit of source code.
-    Full,
-
-    /// The [`Extractor`] implementation partially supports the provided unit of source code.
-    ///
-    /// The specific meaning of "partial support" is up to the implementation. Check its documentation for more details.
-    Partial,
-
-    /// The [`Extractor`] implementation does not support the provided unit of source code.
-    None,
 }
 
 /// An extracted snippet from the given unit of source code.
