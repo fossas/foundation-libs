@@ -30,7 +30,7 @@
 
 use itertools::Itertools;
 use tap::{Pipe, Tap};
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use tree_sitter::Node;
 use tree_sitter_traversal::{traverse_tree, Order};
 
@@ -61,10 +61,36 @@ impl SnippetExtractor for Extractor {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(tree_sitter_c::language())?;
 
-        if parser.parse(content, None).is_some() {
-            Ok(Support::Full)
-        } else {
+        let content = content.as_ref();
+        let Some(tree) = parser.parse(content, None) else {
+            debug!("parse tree was empty");
+            return Ok(Support::None);
+        };
+
+        let error_count = traverse_tree(&tree, Order::Pre)
+            .filter(|node| node.is_error())
+            .inspect(|node| {
+                let start = node.start_position();
+                let end = node.end_position();
+                let loc = SnippetLocation::from(node.byte_range());
+                let snippet = loc.extract_from(content);
+                debug!(
+                    location = %loc,
+                    content = %snippet.display_escaped(),
+                    "syntax error from line {} col {} to line {} col {}",
+                    start.row,
+                    start.column,
+                    end.row,
+                    end.column,
+                );
+            })
+            .count();
+
+        if error_count > 0 {
+            debug!(error_count, "rejecting support: syntax errors");
             Ok(Support::None)
+        } else {
+            Ok(Support::Full)
         }
     }
 
@@ -81,6 +107,13 @@ impl SnippetExtractor for Extractor {
             warn!("provided content did not parse to a tree");
             return Vec::new().pipe(Ok);
         };
+
+        // The user should have already checked for errors via `support`;
+        // just do a cursory check this time.
+        if tree.root_node().has_error() {
+            error!("parsed tree reports a syntax error");
+            return Vec::new().pipe(Ok);
+        }
 
         traverse_tree(&tree, Order::Pre)
             // Nodes that are not "named" are syntax,

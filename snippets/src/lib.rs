@@ -511,7 +511,7 @@ pub struct Location {
 
 impl std::fmt::Display for Location {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}", self.byte_offset, self.byte_len)
+        write!(f, "{}-{}", self.start_byte(), self.end_byte())
     }
 }
 

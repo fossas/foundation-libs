@@ -4,15 +4,15 @@ use snippets::{
 };
 use tap::Pipe;
 
-use crate::{assert_snippets_eq, must, tracing};
+use crate::{assert_snippets_eq, must};
 
 #[test]
 fn hello_world() {
-    tracing::setup();
+    crate::tracing::setup();
 
     let content = include_bytes!("testdata/hello_world.c");
     let opts = Options::new(Kind::Full, Transforms::none());
-    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must parse input");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected = vec![Snippet::new(
         Metadata::new(Kind::Full, Method::Raw, Location::from(21..74)),
@@ -20,4 +20,15 @@ fn hello_world() {
     )];
 
     assert_snippets_eq!(content => extract, expected);
+}
+
+#[test]
+fn hello_world_cpp() {
+    crate::tracing::setup();
+
+    let content = include_bytes!("testdata/hello_world.cpp");
+    let opts = Options::new(Kind::Full, Transforms::none());
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
+
+    assert!(extract.is_empty());
 }
