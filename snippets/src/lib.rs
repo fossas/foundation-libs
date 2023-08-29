@@ -105,17 +105,6 @@ pub trait Extractor {
     /// The source language supported by the implementation.
     type Language: Language;
 
-    /// Reports the support status for extractor for the language of the provided source code.
-    ///
-    /// **Important:**
-    /// This only determines if the extractor _could support_ the given language,
-    /// not whether it will concretely result in actual parsed snippets.
-    ///
-    /// # Reader
-    ///
-    /// The [`Read`] instance provided to `source` may be partially or fully consumed during this process.
-    fn support(content: impl AsRef<[u8]>) -> Result<Self::Support, Error>;
-
     /// Reads the provided unit of source code for snippets, according to the provided options.
     ///
     /// # Reader
@@ -497,6 +486,12 @@ impl std::fmt::Display for Metadata {
 /// assert_eq!(got, "int main()");
 /// # Ok::<(), std::str::Utf8Error>(())
 /// ```
+//
+// Note: we use a `TypedBuilder` instead of a `Constructor` here because this way we can accept
+// a standard `usize` for each argument while still making it very clear in-code
+// which argument is which.
+//
+// Basically, the intent is to straddle the line between newtype convenience and newtype safety.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, CopyGetters, TypedBuilder)]
 #[getset(get_copy = "pub")]
 pub struct Location {
@@ -511,7 +506,7 @@ pub struct Location {
 
 impl std::fmt::Display for Location {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}", self.start_byte(), self.end_byte())
+        write!(f, "{}..={}", self.start_byte(), self.end_byte())
     }
 }
 

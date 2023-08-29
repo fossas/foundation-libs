@@ -43,8 +43,8 @@ macro_rules! assert_snippet_eq {
 
         let text_a = format!("{}", content_a.display_escaped());
         let text_b = format!("{}", content_b.display_escaped());
+        assert_eq!($a.metadata(), $b.metadata(), "'{text_a}' == '{text_b}'");
         assert_eq!(text_a, text_b, "escaped input texts");
-        assert_eq!($a.metadata(), $b.metadata());
 
         let fp_a = format!("{}", $a.fingerprint());
         let fp_b = format!("{}", $b.fingerprint());

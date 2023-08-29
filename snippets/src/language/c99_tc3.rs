@@ -30,7 +30,7 @@
 
 use itertools::Itertools;
 use tap::{Pipe, Tap};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use tree_sitter::Node;
 use tree_sitter_traversal::{traverse_tree, Order};
 
@@ -57,43 +57,6 @@ impl SnippetExtractor for Extractor {
 
     type Language = Language;
 
-    fn support(content: impl AsRef<[u8]>) -> Result<Self::Support, ExtractorError> {
-        let mut parser = tree_sitter::Parser::new();
-        parser.set_language(tree_sitter_c::language())?;
-
-        let content = content.as_ref();
-        let Some(tree) = parser.parse(content, None) else {
-            debug!("parse tree was empty");
-            return Ok(Support::None);
-        };
-
-        let error_count = traverse_tree(&tree, Order::Pre)
-            .filter(|node| node.is_error())
-            .inspect(|node| {
-                let start = node.start_position();
-                let end = node.end_position();
-                let loc = SnippetLocation::from(node.byte_range());
-                let snippet = loc.extract_from(content);
-                debug!(
-                    location = %loc,
-                    content = %snippet.display_escaped(),
-                    "syntax error from line {} col {} to line {} col {}",
-                    start.row,
-                    start.column,
-                    end.row,
-                    end.column,
-                );
-            })
-            .count();
-
-        if error_count > 0 {
-            debug!(error_count, "rejecting support: syntax errors");
-            Ok(Support::None)
-        } else {
-            Ok(Support::Full)
-        }
-    }
-
     #[tracing::instrument(skip_all, fields(kinds = %opts.kinds(), transforms = %opts.transforms(), content_len = content.as_ref().len()))]
     fn extract(
         opts: &SnippetOptions,
@@ -108,13 +71,6 @@ impl SnippetExtractor for Extractor {
             return Vec::new().pipe(Ok);
         };
 
-        // The user should have already checked for errors via `support`;
-        // just do a cursory check this time.
-        if tree.root_node().has_error() {
-            error!("parsed tree reports a syntax error");
-            return Vec::new().pipe(Ok);
-        }
-
         traverse_tree(&tree, Order::Pre)
             // Nodes that are not "named" are syntax,
             // which this function currently ignores.
@@ -124,11 +80,28 @@ impl SnippetExtractor for Extractor {
             .filter(|node| node.is_named())
             // Metadata is used further in the pipeline.
             .map(|node| (node, SnippetLocation::from(node.byte_range())))
+            // Report syntax errors as warnings.
             // Always write the debug line, regardless of the kind of node.
-            .inspect(|(node, loc)| {
-                let kind = node.kind();
-                let snippet = loc.extract_from(content);
-                debug!("{kind}@{loc} -> '{}'", snippet.display_escaped());
+            .inspect(|(node, location)| {
+                if node.is_error() {
+                    let start = node.start_position();
+                    let end = node.end_position();
+                    warn!(
+                        %location,
+                        content = %location.extract_from(content).display_escaped(),
+                        kind = "syntax_error",
+                        line_start = start.row,
+                        line_end = end.row,
+                        col_start = start.column,
+                        col_end = end.column,
+                    );
+                } else {
+                    debug!(
+                        %location,
+                        content = %location.extract_from(content).display_escaped(),
+                        kind = node.kind(),
+                    );
+                }
             })
             // After this point, this function only cares about function definitions.
             .filter(|(node, _)| node.kind() == "function_definition")
