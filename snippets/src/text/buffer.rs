@@ -75,7 +75,7 @@ fn try_decode_utf8(input: &[u8]) -> Cow<'_, str> {
         .unwrap_or_else(|_| as_base64(input).pipe(Cow::Owned))
 }
 
-/// An error that occurrs when trying to decode into a buffer.
+/// An error that occurs when trying to decode into a buffer.
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct DecodeBase64Error(#[from] base64::DecodeError);

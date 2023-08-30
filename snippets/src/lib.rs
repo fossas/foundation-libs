@@ -77,7 +77,7 @@ impl From<tree_sitter::LanguageError> for Error {
     }
 }
 
-/// An error that occurrs when trying to assign an incompatible language to a parser.
+/// An error that occurs when trying to assign an incompatible language to a parser.
 // Note: Implementing it this way allows us to keep `tree_sitter` out of the public API.
 //       More details: https://docs.rs/thiserror/latest/thiserror/
 #[derive(Debug, Error)]
