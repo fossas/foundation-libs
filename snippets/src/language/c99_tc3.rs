@@ -80,7 +80,7 @@ impl SnippetExtractor for Extractor {
             // Metadata is used further in the pipeline.
             .map(|node| (node, SnippetLocation::from(node.byte_range())))
             // Report syntax errors as warnings.
-            // Always write the debug line, regardless of the kind of node.
+            // Always write a debugging line for each node, regardless of the kind of node.
             .inspect(|(node, location)| {
                 if node.is_error() {
                     let start = node.start_position();
