@@ -40,6 +40,7 @@ use crate::{impl_language, impl_prelude::*};
 /// This module implements support for C99 TC3.
 ///
 /// Review module documentation for more details.
+#[derive(Copy, Clone)]
 pub struct Language;
 
 impl SnippetLanguage for Language {

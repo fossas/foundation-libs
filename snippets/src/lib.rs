@@ -26,15 +26,13 @@ use std::{
     str::Utf8Error,
 };
 
-use base64::Engine;
 use derivative::Derivative;
-use derive_more::{Constructor, Deref, From, Index};
+use derive_more::{Constructor, Deref, Index};
 pub use fallible_iterator::FallibleIterator;
 use flagset::{flags, FlagSet};
 use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
-use sha2::{Digest, Sha256};
 use strum::{Display, EnumIter};
 use tap::Pipe;
 use thiserror::Error;
@@ -42,6 +40,7 @@ use typed_builder::TypedBuilder;
 
 pub mod debugging;
 pub mod language;
+pub mod text;
 
 /// Convenience import for all types that
 /// an implementation of [`Extractor`] would likely need.
@@ -366,7 +365,7 @@ pub struct Snippet<L> {
     #[deref]
     #[getset(get = "pub")]
     #[derivative(PartialOrd = "ignore", Ord = "ignore")]
-    fingerprint: PrettyBuffer,
+    fingerprint: text::Buffer,
 
     /// Used to disambiguate snippets by source language.
     ///
@@ -378,11 +377,11 @@ pub struct Snippet<L> {
 impl<L> Snippet<L> {
     /// Create a new snippet from the provided data.
     pub fn from(meta: Metadata, content: impl AsRef<[u8]>) -> Self {
-        generate_fingerprint(&content).pipe(|fp| Self::new(meta, fp))
+        text::fingerprint(&content).pipe(|fp| Self::new(meta, fp))
     }
 
     /// Create a new instance from the provided information.
-    pub fn new(metadata: Metadata, fingerprint: PrettyBuffer) -> Self {
+    pub fn new(metadata: Metadata, fingerprint: text::Buffer) -> Self {
         Self {
             metadata,
             fingerprint,
@@ -1022,64 +1021,6 @@ impl From<Transform> for Transforms {
     fn from(value: Transform) -> Self {
         Self(value.into())
     }
-}
-
-/// Errors reported when decoding a buffer.
-#[derive(Debug, Error)]
-pub enum BufferError {
-    #[error("decode base64 input")]
-    DecodeBase64(#[from] DecodeBase64Error),
-}
-
-/// An error that occurrs when trying to decode into a buffer.
-#[derive(Debug, Error)]
-#[error(transparent)]
-pub struct DecodeBase64Error(#[from] base64::DecodeError);
-
-impl From<base64::DecodeError> for BufferError {
-    fn from(value: base64::DecodeError) -> Self {
-        Self::DecodeBase64(DecodeBase64Error(value))
-    }
-}
-
-/// A byte buffer that reports its base64 value when displayed.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, From)]
-pub struct PrettyBuffer(Vec<u8>);
-
-impl PrettyBuffer {
-    /// Read a base64 string into an instance.
-    pub fn new_base64(input: impl AsRef<[u8]>) -> Result<Self, BufferError> {
-        base64::engine::general_purpose::STANDARD_NO_PAD
-            .decode(input.as_ref())
-            .map_err(BufferError::from)
-            .map(Self)
-    }
-}
-
-impl std::fmt::Debug for PrettyBuffer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let repr = as_base64(&self.0);
-        f.write_fmt(format_args!("PrettyBuffer({repr})"))
-    }
-}
-
-impl std::fmt::Display for PrettyBuffer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let repr = as_base64(&self.0);
-        f.write_fmt(format_args!("{repr}"))
-    }
-}
-
-/// Given a buffer, produce a fingerprint of its contents.
-fn generate_fingerprint(input: impl AsRef<[u8]>) -> PrettyBuffer {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_ref());
-    hasher.finalize().as_slice().to_vec().into()
-}
-
-/// Given a buffer, produce a base64 representation of its contents.
-fn as_base64(input: &[u8]) -> String {
-    base64::engine::general_purpose::STANDARD_NO_PAD.encode(input)
 }
 
 #[cfg(test)]

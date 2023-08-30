@@ -15,20 +15,6 @@
 pub mod language;
 mod tracing;
 
-/// Panic if the provided item is not [`Result::Ok`].
-/// Intended to be used with [`tap::Pipe`].
-///
-/// # Example
-///
-/// ```ignore
-/// use tap::Pipe;
-/// some_function().pipe(must)
-/// ```
-#[track_caller]
-fn must<T: std::fmt::Debug, E: std::fmt::Debug>(item: Result<T, E>) -> T {
-    item.expect("must be successful result")
-}
-
 /// Compare two snippets for equality in context.
 ///
 /// Exists primarily because, since snippets use byte buffers,
@@ -64,4 +50,12 @@ macro_rules! assert_snippets_eq {
             $crate::assert_snippet_eq!($content => a, b);
         }
     }};
+}
+
+/// Include the contents of the file at the provided path, normalizing `\r\n` to `\n`.
+#[macro_export]
+macro_rules! include_str_lf {
+    ($path:expr) => {
+        include_str!($path).replace("\r\n", "\n")
+    };
 }
