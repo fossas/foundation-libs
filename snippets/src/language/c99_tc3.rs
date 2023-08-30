@@ -103,6 +103,7 @@ impl SnippetExtractor for Extractor {
                 }
             })
             // After this point, this function only cares about function definitions.
+            // This is because the snippet scanning product only expects snippets for functions.
             .filter(|(node, _)| node.kind() == "function_definition")
             // Multiple snippets may be built from a single function definition,
             // depending on provided options.
