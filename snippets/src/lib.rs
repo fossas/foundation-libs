@@ -45,7 +45,7 @@ pub mod text;
 /// Convenience import for all types that
 /// an implementation of [`Extractor`] would likely need.
 ///
-/// Some commonly-named types are renamed to reduce the liklihood of collisions
+/// Some commonly-named types are renamed to reduce the likelihood of collisions
 /// when imported via this prelude: e.g. [`Error`] becomes [`ExtractorError`].
 ///
 /// [`Extractor`]: crate::Extractor
