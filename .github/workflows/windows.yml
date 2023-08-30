@@ -7,55 +7,55 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # Cache vcpkg
-    - uses: actions/cache@v3
-      with:
-        path: C:/Users/runneradmin/AppData/Local/vcpkg/archives
-        key: ${{ runner.os }}-vcpkg-cache-x64-windows-static
+      # Cache vcpkg
+      - uses: actions/cache@v3
+        with:
+          path: C:/Users/runneradmin/AppData/Local/vcpkg/archives
+          key: ${{ runner.os }}-vcpkg-cache-x64-windows-static
 
-    # Install system dependencies
-    - run: |
-        vcpkg integrate install
-        vcpkg install libarchive:x64-windows-static
+      # Install system dependencies
+      - run: |
+          vcpkg integrate install
+          vcpkg install libarchive:x64-windows-static
 
-    # Set up repo and toolchain
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
+      # Set up repo and toolchain
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
 
-    # Need a lock file for caching
-    - run: cargo generate-lockfile
-    - uses: Swatinem/rust-cache@v1.3.0
-
-    # Check and test
-    - uses: taiki-e/install-action@nextest
-    - run: cargo check --release --all --bins --examples --tests
-      env:
-        RUSTFLAGS: -C target-feature=+crt-static
-        VCPKGRS_DYNAMIC: 0
-        VCPKG_DEFAULT_TRIPLET: x64-windows-static
-    - run: cargo nextest run --release
-      env:
-        RUSTFLAGS: -C target-feature=+crt-static
-        VCPKGRS_DYNAMIC: 0
-        VCPKG_DEFAULT_TRIPLET: x64-windows-static
-        FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-        FOSSA_ORG_ID: ${{ vars.FOSSA_ORG_ID }}
-        # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
-        # ENABLE_NETWORK_TESTS: "1"
-    # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
-    # run doctests after; this won't result in any extra rebuilds and is very quick.
-    # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
-    - run: cargo test --doc --release
-      env:
-        RUSTFLAGS: -C target-feature=+crt-static
-        VCPKGRS_DYNAMIC: 0
-        VCPKG_DEFAULT_TRIPLET: x64-windows-static
-    # run tests for specific library features
-    - run: cargo test -p traceconf --features serde --release
-      env:
-        RUSTFLAGS: -C target-feature=+crt-static
-        VCPKGRS_DYNAMIC: 0
-        VCPKG_DEFAULT_TRIPLET: x64-windows-static
+      # Need a lock file for caching
+      - run: cargo generate-lockfile
+      - uses: Swatinem/rust-cache@v1.3.0
+      
+      # Check and test
+      - uses: taiki-e/install-action@nextest
+      - run: cargo check --release --all --bins --examples --tests
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+      - run: cargo nextest run
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+          FOSSA_ORG_ID: ${{ vars.FOSSA_ORG_ID }}
+          # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
+          # ENABLE_NETWORK_TESTS: "1"
+      # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
+      # run doctests after; this won't result in any extra rebuilds and is very quick.
+      # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
+      - run: cargo test --doc
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+      # run tests for specific library features
+      - run: cargo test -p traceconf --features serde
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          VCPKGRS_DYNAMIC: 0
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static

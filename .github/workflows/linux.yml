@@ -7,34 +7,34 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    # Install system dependencies
-    - run: |
-        sudo apt-get update
-        sudo apt-get install -y libarchive-dev build-essential nettle-dev libacl1-dev libbz2-dev liblzma-dev liblz4-dev libzstd-dev lzop zlib1g-dev
+      # Install system dependencies
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-dev build-essential nettle-dev libacl1-dev libbz2-dev liblzma-dev liblz4-dev libzstd-dev lzop zlib1g-dev
 
-    # Set up repo and toolchain
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
+      # Set up repo and toolchain
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
 
-    # Need a lock file for caching
-    - run: cargo generate-lockfile
-    - uses: Swatinem/rust-cache@v1.3.0
-
-    # Check and test
-    - uses: taiki-e/install-action@nextest
-    - run: cargo check --release --all --bins --examples --tests
-    - run: cargo nextest run --release
-      env:
-        FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
-        FOSSA_ORG_ID: ${{ vars.FOSSA_ORG_ID }}
-        # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
-        # ENABLE_NETWORK_TESTS: "1"
-    # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
-    # run doctests after; this won't result in any extra rebuilds and is very quick.
-    # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
-    - run: cargo test --doc --release
-    # run tests for specific library features
-    - run: cargo test -p traceconf --features serde --release
+      # Need a lock file for caching
+      - run: cargo generate-lockfile
+      - uses: Swatinem/rust-cache@v1.3.0
+      
+      # Check and test
+      - uses: taiki-e/install-action@nextest
+      - run: cargo check --release --all --bins --examples --tests
+      - run: cargo nextest run
+        env:
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+          FOSSA_ORG_ID: ${{ vars.FOSSA_ORG_ID }}
+          # We should re-enable these but they're taking too long and I don't have time to dig into it right now.
+          # ENABLE_NETWORK_TESTS: "1"
+      # nextest doesn't run doctests, but does test everything else: https://github.com/nextest-rs/nextest/issues/16
+      # run doctests after; this won't result in any extra rebuilds and is very quick.
+      # doctest overview: https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html
+      - run: cargo test --doc
+      # run tests for specific library features
+      - run: cargo test -p traceconf --features serde
