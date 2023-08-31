@@ -773,7 +773,7 @@ impl std::fmt::Display for Kinds {
 #[non_exhaustive]
 pub enum Method {
     /// Generated from the text with the specified normalizations applied.
-    Normalized(Transforms),
+    Normalized(Transform),
 
     /// Generated from the text as written.
     ///
@@ -798,7 +798,9 @@ impl Method {
         if transforms.is_empty() {
             vec![Method::Raw]
         } else {
-            vec![Method::Raw, Method::Normalized(transforms)]
+            std::iter::once(Method::Raw)
+                .chain(transforms.iter().map(Method::Normalized))
+                .collect_vec()
         }
         .into_iter()
     }
@@ -834,6 +836,25 @@ flags! {
     #[strum(serialize_all = "snake_case")]
     #[non_exhaustive]
     pub enum Transform: u8 {
+        /// Transform the text to have any comments removed and whitespace normalized.
+        /// Equivalent to [`Transform::Comment`] followed by [`Transform::Space`].
+        ///
+        /// # Example
+        ///
+        /// The original input:
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String {
+        ///   // TODO: make 'years' smart plural.
+        ///   println!("Happy birthday! You're {age} years old!");
+        /// }
+        /// ```
+        ///
+        /// Is normalized to this:
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String { println!("Happy birthday! You're {age} years old!"); }
+        /// ```
+        Code,
+
         /// Generated with any comments removed. Exactly what constitutes a comment is up to the implementation
         /// of the [`Extractor`] for the language being analyzed.
         ///
@@ -877,66 +898,24 @@ flags! {
     }
 }
 
-impl Transform {
-    /// Scores each variant on its specificity order.
-    ///
-    /// Implemented manually for now, if we ever get lots of variant churn we can look into a macro.
-    /// The specific scores chosen should just ensure that combinations of normalizations compare
-    /// as desired to other combinations.
-    ///
-    /// This is by its nature inexact: there's not always a good way to obviously map
-    /// "A+B+C+D is better than B+C+E+F", but we'll do the best we can.
-    ///
-    /// Scores that are truly equivalent may be given equivalent scores.
-    fn score(self) -> usize {
-        match self {
-            Transform::Comment => 1,
-            Transform::Space => 2,
-        }
-    }
-}
-
 /// The normalizations used to extract this snippet.
 ///
-/// # Specificity order
+/// # Examples
 ///
-/// As discussed on [`Transform`], flags are already ordered by specificity, such that higher
-/// specificity flags are ordered later in a collection.
+/// Single [`Transform`] in the set:
+/// ```
+/// # use snippets::*;
+/// let transforms = Transforms::from(Transform::Space);
+/// assert!(transforms.contains(Transform::Space));
+/// ```
 ///
-/// For [`Transforms`] (this type), it's a little different. Since the goal of "specificity order"
-/// is to sort snippets higher that are _less modified_ from the original source code,
-/// this type is ordered such that:
-/// - If there is a single [`Transform`] in compared sets, they're sorted as usual.
-/// - If there are multiple [`Transform`]s in compared sets, sets with fewer members are higher specificity.
-/// - For sets with the same number of members, sets are compared with the scores of their composite variants.
-///
-/// This works because in this case "more flags" means "more normalizations applied to the source",
-/// which means that they are _less_ specific. Meanwhile, if the count of flags are equal,
-/// the flags used can be extracted and compared by their score.
-///
-/// To give examples using [`Transform`]
-/// (assume a third pretend variant "Other" and pretend it is lower specificity than "Comment"):
-/// - `[Space] > [Comment]`: same as standalone.
-/// - `[Comment] > [Space,Comment]`: fewer modifications.
-/// - `[Space,Comment] > [Comment,Other]`: the score of "Space+Comment" is higher than "Comment+Other".
-///
-/// Scores are set based on the specificity of the variant.
-/// For example, [`Transform::Comment`] is scored `1`, as the lowest specificity;
-/// meanwhile [`Transform::Space`] is scored `2` as the next lowest specificity,
-/// and so on.
-/// Specific score values are not meaningful other than as a non-durable comparison to one another.
-///
-/// # Application order
-///
-/// The order that combinations of flags are applied matters: for instance, note the example for
-/// [`Transform::Space`] creates a syntax error, and the entire function body
-/// would be removed if it was performed before [`Transform::Comment`].
-///
-/// The application order is therefore up to the implementation of [`Extractor`];
-/// users are only able to specify which normalizations are performed.
-///
-/// It also follows that implementations of [`Extractor`] do not necessarily obey
-/// the specificity order of normalizations when applying normalizations.
+/// Multiple [`Transform`]s in the set:
+/// ```
+/// # use snippets::*;
+/// let transforms = Transforms::from(Transform::Space | Transform::Comment);
+/// assert!(transforms.contains(Transform::Space));
+/// assert!(transforms.contains(Transform::Comment));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Transforms(FlagSet<Transform>);
 
@@ -947,15 +926,6 @@ impl Default for Transforms {
 }
 
 impl Transforms {
-    /// Scores each variant in self on its specificity order,
-    /// returning the summed score and the count of applied normalizations.
-    fn score_count(self) -> (usize, usize) {
-        self.0
-            .into_iter()
-            .map(Transform::score)
-            .fold((0, 0), |(prev, len), score| (prev + score, len + 1))
-    }
-
     /// Check whether a given [`Transform`] is in the set.
     ///
     /// # Example
@@ -1026,27 +996,6 @@ impl std::fmt::Display for Transforms {
             .collect_vec()
             .join(",");
         write!(f, "{transforms}")
-    }
-}
-
-impl PartialOrd for Transforms {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Transforms {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let (self_score, self_len) = self.score_count();
-        let (other_score, other_len) = other.score_count();
-        match self_len.cmp(&other_len) {
-            // Fewer normalizations in set; higher specificity.
-            Ordering::Less => Ordering::Greater,
-            // More normalizations in set; lower specificity.
-            Ordering::Greater => Ordering::Less,
-            // Equal count of normalizations in set; order by score.
-            Ordering::Equal => self_score.cmp(&other_score),
-        }
     }
 }
 
@@ -1210,11 +1159,11 @@ mod tests {
 
     #[test]
     fn specificity_order_method() {
-        let arbitrary_flags = Transforms(Transform::Space | Transform::Comment);
-        let mut input = vec![Method::Raw, Method::Normalized(arbitrary_flags)];
+        let arbitrary = Transform::Space;
+        let mut input = vec![Method::Raw, Method::Normalized(arbitrary)];
         input.sort_unstable();
 
-        let expected = vec![Method::Normalized(arbitrary_flags), Method::Raw];
+        let expected = vec![Method::Normalized(arbitrary), Method::Raw];
         assert_eq!(input, expected);
     }
 
@@ -1228,14 +1177,14 @@ mod tests {
     #[test]
     fn specificity_order_normalizations() {
         let mut input = vec![
-            Transforms(FlagSet::from(Transform::Comment)),
-            Transforms(Transform::Space | Transform::Comment),
-            Transforms(FlagSet::from(Transform::Space)),
+            Method::Normalized(Transform::Comment),
+            Method::Normalized(Transform::Code),
+            Method::Normalized(Transform::Space),
         ];
         let expected = vec![
-            Transforms(Transform::Space | Transform::Comment),
-            Transforms(FlagSet::from(Transform::Comment)),
-            Transforms(FlagSet::from(Transform::Space)),
+            Method::Normalized(Transform::Code),
+            Method::Normalized(Transform::Comment),
+            Method::Normalized(Transform::Space),
         ];
 
         input.sort_unstable();
@@ -1253,32 +1202,6 @@ mod tests {
         assert_eq!(got, "int main()");
 
         Ok(())
-    }
-
-    #[test]
-    fn normalizations_count() {
-        let scores = [
-            (FlagSet::from(Transform::Comment), 1),
-            (FlagSet::from(Transform::Space), 1),
-            (Transform::Comment | Transform::Space, 2),
-        ];
-        for (set, expected) in scores {
-            let (_, len) = Transforms(set).score_count();
-            assert_eq!(len, expected, "set: {set:?}");
-        }
-    }
-
-    #[test]
-    fn normalizations_score() {
-        let scores = [
-            (FlagSet::from(Transform::Comment), 1),
-            (FlagSet::from(Transform::Space), 2),
-            (Transform::Comment | Transform::Space, 3),
-        ];
-        for (set, expected) in scores {
-            let (score, _) = Transforms(set).score_count();
-            assert_eq!(score, expected, "set: {set:?}");
-        }
     }
 
     #[test]

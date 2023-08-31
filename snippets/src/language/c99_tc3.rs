@@ -104,15 +104,11 @@ impl SnippetExtractor for Extractor {
             })
             // Hand each node off to be processed into possibly many snippets,
             // based on the provided options.
-            .flat_map(|(node, location)| {
+            .flat_map(|(node, loc)| {
                 opts.cartesian_product()
-                    .filter_map(move |(target, kind, method)| {
-                        if matches_target(&node, target) {
-                            extract(target, kind, method, location, node, content).pipe(Some)
-                        } else {
-                            None
-                        }
-                    })
+                    .filter(move |(target, _, _)| matches_target(*target, node))
+                    .map(move |(t, kind, method)| (t, SnippetMetadata::new(kind, method, loc)))
+                    .map(move |(target, meta)| extract(target, meta, node, content))
             })
             // Then just collect all the produced snippets and done!
             .collect_vec()
@@ -120,18 +116,16 @@ impl SnippetExtractor for Extractor {
     }
 }
 
-#[tracing::instrument(skip_all, fields(%target, %kind, %method, %location))]
+#[tracing::instrument(skip_all, fields(%target, kind = %meta.kind(), method = %meta.method(), location = %meta.location()))]
 fn extract<'a, L>(
     target: SnippetTarget,
-    kind: SnippetKind,
-    method: SnippetMethod,
-    location: SnippetLocation,
+    meta: SnippetMetadata,
     node: Node<'a>,
     content: &'a [u8],
 ) -> Snippet<L> {
-    SnippetMetadata::new(kind, method, location).pipe(|metadata| match target {
-        SnippetTarget::Function => extract_function(metadata, node, content),
-    })
+    match target {
+        SnippetTarget::Function => extract_function(meta, node, content),
+    }
 }
 
 #[tracing::instrument(skip_all)]
@@ -152,18 +146,28 @@ fn extract_function<'a, L>(meta: SnippetMetadata, node: Node<'a>, content: &'a [
 }
 
 #[tracing::instrument(skip_all)]
-fn extract_context<'a>(kind: SnippetKind, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+fn extract_context<'a>(kind: SnippetKind, node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
     match kind {
         SnippetKind::Full => content,
-        kind => unimplemented!("kind: {kind:?}"),
+        SnippetKind::Body => todo!(),
+        SnippetKind::Signature => todo!(),
     }
 }
 
 #[tracing::instrument(skip_all)]
-fn extract_text<'a>(method: SnippetMethod, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+fn extract_text<'a>(method: SnippetMethod, node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
     match method {
         SnippetMethod::Raw => content,
-        method => unimplemented!("method: {method:?}"),
+        SnippetMethod::Normalized(tf) => transform(tf, node, content),
+    }
+}
+
+#[tracing::instrument(skip_all)]
+fn transform<'a>(transform: SnippetTransform, node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+    match transform {
+        SnippetTransform::Code => todo!(),
+        SnippetTransform::Comment => todo!(),
+        SnippetTransform::Space => todo!(),
     }
 }
 
@@ -171,8 +175,8 @@ fn extract_text<'a>(method: SnippetMethod, _node: &Node<'a>, content: &'a [u8]) 
 ///
 /// Defined here instead of on [`SnippetTarget`] because that type should be generic across
 /// language parse strategies instead of being tied to treesitter-specific implementations.
-#[tracing::instrument(skip_all, fields(node_kind = %node.kind(), %target), ret)]
-fn matches_target(node: &Node<'_>, target: SnippetTarget) -> bool {
+#[tracing::instrument(skip_all, fields(%target, node_kind = %node.kind()), ret)]
+fn matches_target(target: SnippetTarget, node: Node<'_>) -> bool {
     match target {
         SnippetTarget::Function => node.kind() == "function_definition",
     }
