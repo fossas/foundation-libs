@@ -102,15 +102,17 @@ impl SnippetExtractor for Extractor {
                     );
                 }
             })
-            // After this point, this function only cares about function definitions.
-            // This is because the snippet scanning product only expects snippets for functions.
-            .filter(|(node, _)| node.kind() == "function_definition")
-            // Multiple snippets may be built from a single function definition,
-            // depending on provided options.
-            .flat_map(|(node, loc)| {
+            // Hand each node off to be processed into possibly many snippets,
+            // based on the provided options.
+            .flat_map(|(node, location)| {
                 opts.cartesian_product()
-                    .map(move |(kind, method)| SnippetMetadata::new(kind, method, loc))
-                    .map(move |meta| extract_one(meta, node, content))
+                    .filter_map(move |(target, kind, method)| {
+                        if matches_target(&node, target) {
+                            extract(target, kind, method, location, node, content).pipe(Some)
+                        } else {
+                            None
+                        }
+                    })
             })
             // Then just collect all the produced snippets and done!
             .collect_vec()
@@ -118,33 +120,60 @@ impl SnippetExtractor for Extractor {
     }
 }
 
-#[tracing::instrument(skip_all, fields(kind = %meta.kind(), method = %meta.method(), loc = %meta.location(), content_len = content.len()))]
-fn extract_one<'a, L>(meta: SnippetMetadata, node: Node<'a>, content: &'a [u8]) -> Snippet<L> {
+#[tracing::instrument(skip_all, fields(%target, %kind, %method, %location))]
+fn extract<'a, L>(
+    target: SnippetTarget,
+    kind: SnippetKind,
+    method: SnippetMethod,
+    location: SnippetLocation,
+    node: Node<'a>,
+    content: &'a [u8],
+) -> Snippet<L> {
+    SnippetMetadata::new(kind, method, location).pipe(|metadata| match target {
+        SnippetTarget::Function => extract_function(metadata, node, content),
+    })
+}
+
+#[tracing::instrument(skip_all)]
+fn extract_function<'a, L>(meta: SnippetMetadata, node: Node<'a>, content: &'a [u8]) -> Snippet<L> {
     // Extract the highlighted function from the broader content.
     meta.location()
         .extract_from(content)
         .tap(|raw| debug!(raw = %raw.display_escaped()))
         // "context" is the function after having been selected for "kind".
-        .pipe(|raw| extract_context(&meta, &node, raw))
+        .pipe(|raw| extract_context(meta.kind(), &node, raw))
         .tap(|context| debug!(context = %context.display_escaped()))
         // "text" is the function after transforms (if any).
-        .pipe(|context| extract_text(&meta, &node, context))
+        .pipe(|context| extract_text(meta.method(), &node, context))
         .tap(|text| debug!(text = %text.display_escaped()))
         // Finally, construct the fingerprint itself.
         .pipe(|text| Snippet::from(meta, text))
         .tap(|snippet| debug!(fingerprint = %snippet.fingerprint()))
 }
 
-fn extract_context<'a>(meta: &SnippetMetadata, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
-    match meta.kind() {
+#[tracing::instrument(skip_all)]
+fn extract_context<'a>(kind: SnippetKind, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+    match kind {
         SnippetKind::Full => content,
         kind => unimplemented!("kind: {kind:?}"),
     }
 }
 
-fn extract_text<'a>(meta: &SnippetMetadata, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
-    match meta.method() {
+#[tracing::instrument(skip_all)]
+fn extract_text<'a>(method: SnippetMethod, _node: &Node<'a>, content: &'a [u8]) -> &'a [u8] {
+    match method {
         SnippetMethod::Raw => content,
         method => unimplemented!("method: {method:?}"),
+    }
+}
+
+/// Report whether the given treesitter node kind is a valid entrypoint for the target.
+///
+/// Defined here instead of on [`SnippetTarget`] because that type should be generic across
+/// language parse strategies instead of being tied to treesitter-specific implementations.
+#[tracing::instrument(skip_all, fields(node_kind = %node.kind(), %target), ret)]
+fn matches_target(node: &Node<'_>, target: SnippetTarget) -> bool {
+    match target {
+        SnippetTarget::Function => node.kind() == "function_definition",
     }
 }

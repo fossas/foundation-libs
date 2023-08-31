@@ -34,7 +34,7 @@ use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use strum::{Display, EnumIter};
-use tap::Pipe;
+use tap::{Conv, Pipe};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -55,7 +55,7 @@ pub mod impl_prelude {
         Error as ExtractorError, Extractor as SnippetExtractor, Kind as SnippetKind,
         Kinds as SnippetKinds, Language as SnippetLanguage, LanguageError,
         Location as SnippetLocation, Metadata as SnippetMetadata, Method as SnippetMethod,
-        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy,
+        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy, Target as SnippetTarget,
         Transform as SnippetTransform, Transforms as SnippetTransforms,
     };
 }
@@ -107,13 +107,37 @@ pub trait Extractor {
 /// Options for extracting snippets.
 /// Options are constructed via the `Options::builder` method.
 ///
+/// # Best effort
+///
+/// Constructed combinations of options may not make sense.
+/// For example, a hypothetical future [`Target`] type may not ever have comments
+/// (imagine a `Target` that reports only a function name and a list of argument types for example),
+/// and therefore [`Transform::Comment`] may not make sense in the context of that target.
+///
+/// It is up to the snippet implementation what happens in this scenario.
+/// Consumers should not rely on any particular behavior here, and should expect to filter or handle
+/// any combination of skippets that the provided options allow.
+///
+/// By default the recommendation is that the implementation should emit a snippet for all combinations,
+/// and leave it up to consumers to decide what constitutes a duplicate snippet and de-duplicate as desired.
+///
+/// # Defaults and empty sets
+///
+/// With the exception of [`Options::transforms`], any empty set provided
+/// is replaced with the default set
+/// (as provided by the implementation of [`Default`] for [`Options`]).
+///
 /// By default, all kinds of snippet are extracted, and all normalizations are applied.
 /// Providing an empty set to [`Options::kinds`] is equivalent to the default set
 /// (namely, all [`Kind`]s).
 ///
-/// All options implicitly assume [`Method::Raw`]; it is not currently possible to disable
-/// this snippet extraction method. This means that providing an empty set of transforms
-/// (via [`Transforms::none`]) results in a collection of snippets extracted with [`Method::Raw`].
+/// # The [`Method`] type
+///
+/// [`Options::transforms`] is converted to [`Method`],
+/// always implicitly attaching [`Method::Raw`] which cannot be disabled.
+///
+/// Specifically, an empty [`Options::transforms`] still results in [`Method::Raw`]
+/// fingerprints being provided.
 ///
 /// # Examples
 ///
@@ -122,6 +146,7 @@ pub trait Extractor {
 /// # use snippets::*;
 /// let options = Options::default();
 ///
+/// assert_eq!(options.targets(), Targets::full());
 /// assert_eq!(options.kinds(), Kinds::full());
 /// assert_eq!(options.transforms(), Transforms::full());
 /// ```
@@ -129,7 +154,7 @@ pub trait Extractor {
 /// Restricting the kinds of snippet extracted:
 /// ```
 /// # use snippets::*;
-/// let options = Options::new(Kind::Signature, Transforms::full());
+/// let options = Options::new(Target::Function, Kind::Signature, Transforms::full());
 /// assert!(options.kinds().contains(Kind::Signature));
 /// assert!(!options.kinds().contains(Kind::Body));
 /// assert!(!options.kinds().contains(Kind::Full));
@@ -138,7 +163,7 @@ pub trait Extractor {
 /// Restricting the transforms applied:
 /// ```
 /// # use snippets::*;
-/// let options = Options::new(Kinds::full(), Transform::Comment);
+/// let options = Options::new(Target::Function, Kinds::full(), Transform::Comment);
 /// assert!(options.transforms().contains(Transform::Comment));
 /// assert!(!options.transforms().contains(Transform::Space));
 /// ```
@@ -146,12 +171,15 @@ pub trait Extractor {
 /// Only use [`Method::Raw`]:
 /// ```
 /// # use snippets::*;
-/// let options = Options::new(Kinds::full(), Transforms::none());
+/// let options = Options::new(Target::Function, Kinds::full(), Transforms::none());
 /// assert!(options.transforms().is_empty());
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, CopyGetters)]
 #[getset(get_copy = "pub")]
 pub struct Options {
+    /// The target units of source code to extract as snippets.
+    targets: Targets,
+
     /// The kinds of snippet to extract.
     kinds: Kinds,
 
@@ -161,34 +189,33 @@ pub struct Options {
 
 impl Options {
     /// Create a new set of options for a snippet extractor.
-    pub fn new(kinds: impl Into<Kinds>, transforms: impl Into<Transforms>) -> Self {
+    pub fn new(
+        targets: impl Into<Targets>,
+        kinds: impl Into<Kinds>,
+        transforms: impl Into<Transforms>,
+    ) -> Self {
         Self {
-            kinds: Self::non_empty_kinds(kinds),
+            targets: targets.conv::<Targets>().default_if_empty(),
+            kinds: kinds.conv::<Kinds>().default_if_empty(),
             transforms: transforms.into(),
         }
     }
 
     /// Report the cartesian product of the configured [`Kind`]s of snippets to extract
     /// with configured [`Method`]s to apply.
-    pub fn cartesian_product(&self) -> impl Iterator<Item = (Kind, Method)> {
-        self.kinds
-            .iter()
-            .cartesian_product(Method::iter(self.transforms))
-    }
-
-    fn non_empty_kinds(input: impl Into<Kinds>) -> Kinds {
-        let input = input.into();
-        if input.is_empty() {
-            Kinds::full()
-        } else {
-            input
-        }
+    pub fn cartesian_product(&self) -> impl Iterator<Item = (Target, Kind, Method)> {
+        itertools::iproduct!(
+            self.targets.iter(),
+            self.kinds.iter(),
+            Method::iter(self.transforms)
+        )
     }
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
+            targets: Targets::full(),
             kinds: Kinds::full(),
             transforms: Transforms::full(),
         }
@@ -596,7 +623,7 @@ flags! {
     #[strum(serialize_all = "snake_case")]
     #[non_exhaustive]
     pub enum Kind: u8 {
-        /// The signature of the function.
+        /// The signature of the snippet.
         ///
         /// ```ignore
         /// fn say_happy_birthday(age: usize) -> String            // <- included
@@ -606,7 +633,7 @@ flags! {
         /// ```
         Signature,
 
-        /// The body of the function.
+        /// The body of the snippet.
         ///
         /// ```ignore
         /// fn say_happy_birthday(age: usize) -> String {          // <- omitted
@@ -615,7 +642,7 @@ flags! {
         /// ```
         Body,
 
-        /// Both signature and body.
+        /// Both signature and body in one snippet.
         ///
         /// ```ignore
         /// fn say_happy_birthday(age: usize) -> String {          // <- included
@@ -644,8 +671,14 @@ flags! {
 /// assert!(kinds.contains(Kind::Signature));
 /// assert!(kinds.contains(Kind::Body));
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Kinds(FlagSet<Kind>);
+
+impl Default for Kinds {
+    fn default() -> Self {
+        Self::full()
+    }
+}
 
 impl Kinds {
     /// Check whether a given [`Kind`] is in the set.
@@ -904,8 +937,14 @@ impl Transform {
 ///
 /// It also follows that implementations of [`Extractor`] do not necessarily obey
 /// the specificity order of normalizations when applying normalizations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Transforms(FlagSet<Transform>);
+
+impl Default for Transforms {
+    fn default() -> Self {
+        Self::full()
+    }
+}
 
 impl Transforms {
     /// Scores each variant in self on its specificity order,
@@ -1020,6 +1059,140 @@ impl From<FlagSet<Transform>> for Transforms {
 impl From<Transform> for Transforms {
     fn from(value: Transform) -> Self {
         Self(value.into())
+    }
+}
+
+flags! {
+    /// The targets of snippets to extract.
+    ///
+    /// # Specificity order
+    ///
+    /// Specificity is in the order specified by the implementation of [`Ord`] for this type.
+    /// Currently only one variant exists, but the idea is similar to that of [`Kind`] or [`Transform`]:
+    /// the more exact and meaningful the snippet target, the higher specificity.
+    ///
+    /// Items with higher "specificity order" are sorted _higher_; meaning that a
+    /// higher specificity variant is sorted later in a vector
+    /// than a lower specificity variant.
+    #[derive(Hash, PartialOrd, Ord, EnumIter, Display)]
+    #[strum(serialize_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum Target: u8 {
+        /// Targets function defintions as snippets.
+        Function,
+    }
+}
+
+/// The targets of snippet to extract.
+///
+/// # Examples
+///
+/// Single [`Target`] in the set:
+/// ```
+/// # use snippets::*;
+/// let targets = Targets::from(Target::Function);
+/// assert!(targets.contains(Target::Function));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Targets(FlagSet<Target>);
+
+impl Default for Targets {
+    fn default() -> Self {
+        Self::full()
+    }
+}
+
+impl Targets {
+    /// Target function declarations as snippets.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let targets = Targets::from(Target::Function);
+    /// assert!(targets.contains(Target::Function));
+    /// ```
+    pub fn contains(&self, target: Target) -> bool {
+        self.0.contains(target)
+    }
+
+    /// Check whether the set is empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let targets = Targets::from(Target::Function);
+    /// assert!(!targets.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Create a new set of all [`Target`]s.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let targets = Targets::full();
+    /// assert!(targets.contains(Target::Function));
+    /// ```
+    pub fn full() -> Self {
+        Self(FlagSet::full())
+    }
+
+    /// Iterate over the [`Target`]s in the set.
+    pub fn iter(&self) -> impl Iterator<Item = Target> + Clone {
+        self.0.into_iter()
+    }
+}
+
+impl From<FlagSet<Target>> for Targets {
+    fn from(value: FlagSet<Target>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Target> for Targets {
+    fn from(value: Target) -> Self {
+        Self(value.into())
+    }
+}
+
+impl std::fmt::Display for Targets {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let targets = self
+            .iter()
+            .sorted_unstable()
+            .map(|t| t.to_string())
+            .collect_vec()
+            .join(",");
+        write!(f, "{targets}")
+    }
+}
+
+impl DefaultIfEmpty for Targets {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+impl DefaultIfEmpty for Kinds {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+trait DefaultIfEmpty: Default {
+    fn is_empty(&self) -> bool;
+
+    fn default_if_empty(self) -> Self {
+        if self.is_empty() {
+            Self::default()
+        } else {
+            self
+        }
     }
 }
 

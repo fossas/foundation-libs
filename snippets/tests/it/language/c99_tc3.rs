@@ -1,5 +1,5 @@
 use snippets::{
-    language::c99_tc3, text, Extractor, Kind, Location, Metadata, Method, Options, Snippet,
+    language::c99_tc3, text, Extractor, Kind, Location, Metadata, Method, Options, Snippet, Target,
     Transforms,
 };
 
@@ -10,7 +10,7 @@ fn full_raw_hello_world() {
     crate::tracing::setup();
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world.c");
-    let opts = Options::new(Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
     let expected = vec![Snippet::new(
@@ -32,7 +32,7 @@ fn full_raw_hello_world_crlf_lf() {
     let content_lf = include_str!("testdata/c99_tc3/hello_world.c").replace("\r\n", "\n");
     let content_crlf = content_lf.replace('\n', "\r\n");
 
-    let opts = Options::new(Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
     let extract_lf = c99_tc3::Extractor::extract(&opts, &content_lf).unwrap();
     let extract_crlf = c99_tc3::Extractor::extract(&opts, &content_crlf).unwrap();
 
@@ -56,7 +56,7 @@ fn full_raw_hello_world_syntax_error() {
     crate::tracing::setup();
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_error.c");
-    let opts = Options::new(Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
     let expected = vec![Snippet::new(
