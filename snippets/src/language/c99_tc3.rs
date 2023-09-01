@@ -71,17 +71,17 @@ impl SnippetExtractor for Extractor {
         };
 
         traverse_tree(&tree, Order::Pre)
-            // Nodes that are not "named" are syntax,
-            // which this function currently ignores.
-            //
-            // Reference:
-            // https://tree-sitter.github.io/tree-sitter/using-parsers#named-vs-anonymous-nodes
-            .filter(|node| node.is_named())
             // Metadata is used further in the pipeline.
             .map(|node| (node, SnippetLocation::from(node.byte_range())))
             // Report syntax errors as warnings.
             // Always write a debugging line for each node, regardless of the kind of node.
             .inspect(|(node, location)| inspect_node(node, location, content))
+            // Nodes that are not "named" are syntax,
+            // which this function currently ignores.
+            //
+            // Reference:
+            // https://tree-sitter.github.io/tree-sitter/using-parsers#named-vs-anonymous-nodes
+            .filter(|(node, _)| node.is_named())
             // Hand each node off to be processed into possibly many snippets,
             // based on the provided options.
             .flat_map(|(node, loc)| {
@@ -138,13 +138,47 @@ fn extract_context<'a>(
 ) -> Option<(&'a [u8], SnippetLocation)> {
     match meta.kind() {
         SnippetKind::Full => (content, meta.location()).pipe(Some),
-        SnippetKind::Body => todo!(),
+        SnippetKind::Body => {
+            // This node starts at the start of the function.
+            // The end of the parameter list signifies the end of the function signature.
+            let Some((plist, _)) = traverse(node.walk(), Order::Pre)
+                .map(|node| (node, node.byte_range().pipe(SnippetLocation::from)))
+                .inspect(|(node, location)| inspect_node(node, location, content))
+                .find(|(node, _)| node.kind() == "parameter_list")
+            else {
+                warn!("function body not found: no 'parameter_list' node");
+                return None;
+            };
+
+            // This node ends at the end of the function.
+            // Since the end of the parameter list signifies the start, anything between is the body.
+            let mut offset = plist.end_byte();
+            let end = node.end_byte();
+
+            // Skip any spaces between the two though. Nobody cares about these.
+            while offset < end && content[offset].is_ascii_whitespace() {
+                offset += 1;
+            }
+            if offset == end {
+                warn!("function body appears to be made up entirely of spaces");
+                offset = plist.end_byte();
+            }
+
+            // Since the resulting snippet is a subset of the original snippet
+            // indicated by the entire node, return a new location for it.
+            let report_as = SnippetLocation::builder()
+                .byte_offset(offset)
+                .byte_len(end - offset)
+                .build();
+
+            (report_as.extract_from(content), report_as).pipe(Some)
+        }
         SnippetKind::Signature => {
-            // We know this node starts at the start of the function.
+            // This node starts at the start of the function.
             //
             // Find the parameter list, signifying the end of the function signature,
             // and just slice all the text up to the end of that.
-            let Some((_, loc)) = traverse(node.walk(), Order::Pre)
+            let Some((_, plist)) = traverse(node.walk(), Order::Pre)
                 .map(|node| (node, node.byte_range().pipe(SnippetLocation::from)))
                 .inspect(|(node, location)| inspect_node(node, location, content))
                 .find(|(node, _)| node.kind() == "parameter_list")
@@ -154,10 +188,10 @@ fn extract_context<'a>(
             };
 
             // Since the resulting snippet is a subset of the original snippet
-            // indicated by the entire node, we return a new location for it.
+            // indicated by the entire node, return a new location for it.
             let report_as = SnippetLocation::builder()
                 .byte_offset(meta.location().start_byte())
-                .byte_len(1 + loc.end_byte() - meta.location().start_byte())
+                .byte_len(1 + plist.end_byte() - meta.location().start_byte())
                 .build();
 
             (report_as.extract_from(content), report_as).pipe(Some)
