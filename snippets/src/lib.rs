@@ -20,7 +20,6 @@
 
 use std::{
     borrow::Cow,
-    cmp::Ordering,
     marker::PhantomData,
     ops::{Range, RangeInclusive},
     str::Utf8Error,

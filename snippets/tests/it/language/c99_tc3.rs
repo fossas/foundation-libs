@@ -66,3 +66,19 @@ fn full_raw_hello_world_syntax_error() {
 
     assert_snippets_eq!(content.as_bytes() => extract, expected);
 }
+
+#[test]
+fn signature_raw_hello_world() {
+    crate::tracing::setup();
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world.c");
+    let opts = Options::new(Target::Function, Kind::Signature, Transforms::none());
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected = vec![Snippet::new(
+        Metadata::new(Kind::Signature, Method::Raw, Location::from(21..31)),
+        text::Buffer::base64("OFxpLQXYGQzLjWud7D9ZLoq6Agzu9eaH/38i58yqZJs").unwrap(),
+    )];
+
+    assert_snippets_eq!(content.as_bytes() => extract, expected);
+}
