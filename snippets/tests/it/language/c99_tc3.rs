@@ -98,3 +98,51 @@ fn body_raw_hello_world() {
 
     assert_snippets_eq!(content.as_bytes() => extract, expected);
 }
+
+#[test]
+fn full_raw_hello_world_comment() {
+    crate::tracing::setup();
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected = vec![Snippet::new(
+        Metadata::new(Kind::Full, Method::Raw, Location::from(84..1336)),
+        text::Buffer::base64("1cy0e0XWhtv2K+NUlit7XAEi82i24uzNLPFIuWdp/sg").unwrap(),
+    )];
+
+    assert_snippets_eq!(content.as_bytes() => extract, expected);
+}
+
+#[test]
+fn signature_raw_hello_world_comment() {
+    crate::tracing::setup();
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, Kind::Signature, Transforms::none());
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected = vec![Snippet::new(
+        Metadata::new(Kind::Signature, Method::Raw, Location::from(84..224)),
+        text::Buffer::base64("G0h/1tjEyhgmHYpYmh6YG96w3VMP6dcWEWuzySvcIgg").unwrap(),
+    )];
+
+    assert_snippets_eq!(content.as_bytes() => extract, expected);
+}
+
+#[test]
+fn body_raw_hello_world_comment() {
+    crate::tracing::setup();
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, Kind::Body, Transforms::none());
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected = vec![Snippet::new(
+        Metadata::new(Kind::Body, Method::Raw, Location::from(225..1336)),
+        text::Buffer::base64("80sDWKc29V05VP1QV6jYfTdCWdudHPl4/9rA6qcS+UU").unwrap(),
+    )];
+
+    assert_snippets_eq!(content.as_bytes() => extract, expected);
+}

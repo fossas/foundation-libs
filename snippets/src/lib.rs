@@ -765,8 +765,8 @@ impl std::fmt::Display for Kinds {
 ///
 /// ```
 /// # use snippets::*;
-/// # let arbitrary_flagset = Transforms::from(Transform::Space);
-/// assert!(Method::Raw > Method::Normalized(arbitrary_flagset));
+/// # let arbitrary = Transform::Space;
+/// assert!(Method::Raw > Method::Normalized(arbitrary));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
