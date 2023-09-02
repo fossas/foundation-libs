@@ -6,9 +6,11 @@ use tap::Pipe;
 
 pub use buffer::Buffer;
 pub use normalize_lines::*;
+pub use normalize_space::*;
 
 pub mod buffer;
 mod normalize_lines;
+mod normalize_space;
 
 /// Given a buffer, produce a fingerprint of its contents.
 pub fn fingerprint(input: impl AsRef<[u8]>) -> Buffer {

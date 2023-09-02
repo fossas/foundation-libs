@@ -18,6 +18,8 @@
 //! `lang-c99-tc3` | Enables support for C99 TC3 | Language
 //! `sha2-asm` | Enables hardware acceleration for SHA2 | Performance
 
+#![deny(clippy::invalid_regex)]
+
 use std::{
     borrow::Cow,
     marker::PhantomData,
@@ -184,6 +186,10 @@ pub struct Options {
 
     /// The normalizations used to extract this snippet.
     transforms: Transforms,
+
+    /// Include the `raw` method.
+    /// Recommended for general use; disabling is mainly intended for tests.
+    include_raw: bool,
 }
 
 impl Options {
@@ -197,16 +203,31 @@ impl Options {
             targets: targets.conv::<Targets>().default_if_empty(),
             kinds: kinds.conv::<Kinds>().default_if_empty(),
             transforms: transforms.into(),
+            include_raw: true,
+        }
+    }
+
+    /// Disable generating [`Method::Raw`] snippets.
+    pub fn disable_raw(self) -> Self {
+        Self {
+            include_raw: false,
+            ..self
         }
     }
 
     /// Report the cartesian product of the configured [`Kind`]s of snippets to extract
     /// with configured [`Method`]s to apply.
     pub fn cartesian_product(&self) -> impl Iterator<Item = (Target, Kind, Method)> {
+        let include_raw = self.include_raw;
         itertools::iproduct!(
             self.targets.iter(),
             self.kinds.iter(),
-            Method::iter(self.transforms)
+            Method::iter(self.transforms).filter(move |method| {
+                match method {
+                    Method::Raw => include_raw,
+                    _ => true,
+                }
+            })
         )
     }
 }
@@ -217,6 +238,7 @@ impl Default for Options {
             targets: Targets::full(),
             kinds: Kinds::full(),
             transforms: Transforms::full(),
+            include_raw: true,
         }
     }
 }
@@ -379,7 +401,7 @@ pub enum Strategy {
 }
 
 /// An extracted snippet from the given unit of source code.
-#[derive(Debug, Clone, Getters, CopyGetters, Index, Deref, Derivative)]
+#[derive(Clone, Getters, CopyGetters, Index, Deref, Derivative, TypedBuilder)]
 #[derivative(PartialOrd, Ord, PartialEq, Eq)]
 pub struct Snippet<L> {
     /// Metadata for the extracted snippet.
@@ -393,32 +415,44 @@ pub struct Snippet<L> {
     #[derivative(PartialOrd = "ignore", Ord = "ignore")]
     fingerprint: text::Buffer,
 
+    /// Reports the content that actually generated the fingerprint.
+    #[getset(get = "pub")]
+    #[derivative(PartialOrd = "ignore", Ord = "ignore", PartialEq = "ignore")]
+    content: text::Buffer,
+
     /// Used to disambiguate snippets by source language.
     ///
     /// Technically this is evaluated for ordering and equality,
     /// but `PhantomData<T>` is always equal to itself for both checks.
+    #[builder(default, setter(skip))]
     language: PhantomData<L>,
 }
 
 impl<L> Snippet<L> {
     /// Create a new snippet from the provided data.
     pub fn from(meta: Metadata, content: impl AsRef<[u8]>) -> Self {
-        text::fingerprint(&content).pipe(|fp| Self::new(meta, fp))
-    }
-
-    /// Create a new instance from the provided information.
-    pub fn new(metadata: Metadata, fingerprint: text::Buffer) -> Self {
-        Self {
-            metadata,
-            fingerprint,
-            language: PhantomData,
-        }
+        Self::builder()
+            .content(text::Buffer::new(content.as_ref()))
+            .fingerprint(text::fingerprint(content))
+            .metadata(meta)
+            .build()
     }
 }
 
 impl<L: Language> std::fmt::Display for Snippet<L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", L::display(), self.metadata)
+    }
+}
+
+impl<L: Language> std::fmt::Debug for Snippet<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Snippet")
+            .field("language", &L::display())
+            .field("metadata", &self.metadata)
+            .field("fingerprint", &self.fingerprint)
+            .field("content", &self.content)
+            .finish()
     }
 }
 
@@ -805,6 +839,16 @@ impl Method {
     }
 }
 
+impl From<Option<Transform>> for Method {
+    fn from(value: Option<Transform>) -> Self {
+        if let Some(tf) = value {
+            Method::Normalized(tf)
+        } else {
+            Method::Raw
+        }
+    }
+}
+
 impl std::fmt::Display for Method {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -1007,6 +1051,16 @@ impl From<FlagSet<Transform>> for Transforms {
 impl From<Transform> for Transforms {
     fn from(value: Transform) -> Self {
         Self(value.into())
+    }
+}
+
+impl From<Option<Transform>> for Transforms {
+    fn from(value: Option<Transform>) -> Self {
+        if let Some(tf) = value {
+            tf.into()
+        } else {
+            Transforms::none()
+        }
     }
 }
 

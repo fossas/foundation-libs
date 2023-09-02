@@ -1,29 +1,40 @@
+use itertools::Itertools;
+use pretty_assertions::assert_eq;
 use snippets::{
-    language::c99_tc3, text, Extractor, Kind, Location, Metadata, Method, Options, Snippet, Target,
-    Transforms,
+    language::c99_tc3, Extractor, Kind, Location, Metadata, Method, Options, Snippet, Target,
+    Transform, Transforms,
 };
 
-use crate::{assert_snippets_eq, include_str_lf};
+use crate::include_str_lf;
 
 #[test]
 fn full_raw_hello_world() {
     crate::tracing::setup();
 
+    let kind = Kind::Full;
+    let transform = None;
+    let span = Location::from(21..74);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world.c");
-    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, kind, Transforms::from(transform));
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Full, Method::Raw, Location::from(21..74)),
-        text::Buffer::base64("RjpGXHcd2yCz04Q+BXBT3w65hnLBbXZE+zcmBW4OPw0").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, Method::from(transform), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
 }
 
 #[test]
 fn full_raw_hello_world_crlf_lf() {
     crate::tracing::setup();
+
+    let kind = Kind::Full;
+    let transform = None;
+    let span_lf = Location::from(21..74);
+    let span_crlf = Location::from(24..80);
 
     // This test runs on both Windows and other platforms, so it normalizes
     // to \n regardless of the actual example file and then expands that back to \r\n.
@@ -32,117 +43,170 @@ fn full_raw_hello_world_crlf_lf() {
     let content_lf = include_str!("testdata/c99_tc3/hello_world.c").replace("\r\n", "\n");
     let content_crlf = content_lf.replace('\n', "\r\n");
 
-    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, kind, Transforms::from(transform));
     let extract_lf = c99_tc3::Extractor::extract(&opts, &content_lf).unwrap();
     let extract_crlf = c99_tc3::Extractor::extract(&opts, &content_crlf).unwrap();
 
     // Even though the fingerprints themselves are normalized, they'll still be at different byte offsets.
-    let shared_fp = text::Buffer::base64("RjpGXHcd2yCz04Q+BXBT3w65hnLBbXZE+zcmBW4OPw0").unwrap();
-    let expected_lf = vec![Snippet::new(
-        Metadata::new(Kind::Full, Method::Raw, Location::from(21..74)),
-        shared_fp.clone(),
+    let expected_lf = vec![Snippet::from(
+        Metadata::new(kind, Method::from(transform), span_lf),
+        span_lf.extract_from(content_lf.as_bytes()),
     )];
-    let expected_crlf = vec![Snippet::new(
-        Metadata::new(Kind::Full, Method::Raw, Location::from(24..80)),
-        shared_fp,
+    let expected_crlf = vec![Snippet::from(
+        Metadata::new(kind, Method::from(transform), span_crlf),
+        span_crlf.extract_from(content_crlf.as_bytes()),
     )];
 
-    assert_snippets_eq!(content_lf.as_bytes() => extract_lf, expected_lf);
-    assert_snippets_eq!(content_crlf.as_bytes() => extract_crlf, expected_crlf);
+    assert_eq!(extract_lf.clone(), expected_lf);
+    assert_eq!(extract_crlf.clone(), expected_crlf);
+
+    let fingerprints_lf = extract_lf
+        .into_iter()
+        .map(|snippet| snippet.fingerprint().clone())
+        .collect_vec();
+    let fingerprints_crlf = extract_crlf
+        .into_iter()
+        .map(|snippet| snippet.fingerprint().clone())
+        .collect_vec();
+    assert_eq!(fingerprints_lf, fingerprints_crlf);
 }
 
 #[test]
 fn full_raw_hello_world_syntax_error() {
     crate::tracing::setup();
 
+    let kind = Kind::Full;
+    let transform = None;
+    let span = Location::from(21..=68);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world_error.c");
-    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, kind, Transforms::from(transform));
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Full, Method::Raw, Location::from(21..=68)),
-        text::Buffer::base64("7SCsdDPxPL3YWRHA2DO9AWfKFv11QWeNzNYF3PLSnVQ").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, Method::from(transform), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
 }
 
 #[test]
 fn signature_raw_hello_world() {
     crate::tracing::setup();
 
+    let kind = Kind::Signature;
+    let transform = None;
+    let span = Location::from(21..31);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world.c");
-    let opts = Options::new(Target::Function, Kind::Signature, Transforms::none());
+    let opts = Options::new(Target::Function, kind, Transforms::from(transform));
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Signature, Method::Raw, Location::from(21..31)),
-        text::Buffer::base64("OFxpLQXYGQzLjWud7D9ZLoq6Agzu9eaH/38i58yqZJs").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
 }
 
 #[test]
 fn body_raw_hello_world() {
     crate::tracing::setup();
 
+    let kind = Kind::Body;
+    let transform = None;
+    let span = Location::from(32..74);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world.c");
-    let opts = Options::new(Target::Function, Kind::Body, Transforms::none());
+    let opts = Options::new(Target::Function, kind, Transforms::from(transform));
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Body, Method::Raw, Location::from(32..74)),
-        text::Buffer::base64("v2x9rdvIqjoxVU+cnxMjxitPtGNWm83OR+GxsI/AiE4").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
+}
+
+#[test]
+fn full_space_hello_world() {
+    crate::tracing::setup();
+
+    let kind = Kind::Full;
+    let transform = Some(Transform::Space);
+    let span = Location::from(21..74);
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
+
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        br#"int main() { printf("hello world\n"); return 0; }"#,
+    )];
+
+    assert_eq!(extract, expected);
 }
 
 #[test]
 fn full_raw_hello_world_comment() {
     crate::tracing::setup();
 
+    let kind = Kind::Full;
+    let transform = None;
+    let span = Location::from(84..1336);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
-    let opts = Options::new(Target::Function, Kind::Full, Transforms::none());
+    let opts = Options::new(Target::Function, kind, transform);
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Full, Method::Raw, Location::from(84..1336)),
-        text::Buffer::base64("1cy0e0XWhtv2K+NUlit7XAEi82i24uzNLPFIuWdp/sg").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
 }
 
 #[test]
 fn signature_raw_hello_world_comment() {
     crate::tracing::setup();
 
+    let kind = Kind::Signature;
+    let transform = None;
+    let span = Location::from(84..224);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
-    let opts = Options::new(Target::Function, Kind::Signature, Transforms::none());
+    let opts = Options::new(Target::Function, kind, transform);
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Signature, Method::Raw, Location::from(84..224)),
-        text::Buffer::base64("G0h/1tjEyhgmHYpYmh6YG96w3VMP6dcWEWuzySvcIgg").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
 }
 
 #[test]
 fn body_raw_hello_world_comment() {
     crate::tracing::setup();
 
+    let kind = Kind::Body;
+    let transform = None;
+    let span = Location::from(225..1336);
+
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
-    let opts = Options::new(Target::Function, Kind::Body, Transforms::none());
+    let opts = Options::new(Target::Function, kind, transform);
     let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
 
-    let expected = vec![Snippet::new(
-        Metadata::new(Kind::Body, Method::Raw, Location::from(225..1336)),
-        text::Buffer::base64("80sDWKc29V05VP1QV6jYfTdCWdudHPl4/9rA6qcS+UU").unwrap(),
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        span.extract_from(content.as_bytes()),
     )];
 
-    assert_snippets_eq!(content.as_bytes() => extract, expected);
+    assert_eq!(extract, expected);
 }

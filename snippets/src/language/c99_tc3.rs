@@ -37,6 +37,7 @@ use tree_sitter::Node;
 use tree_sitter_traversal::{traverse, traverse_tree, Order};
 
 use crate::debugging::ToDisplayEscaped;
+use crate::text::normalize_space;
 use crate::{impl_language, impl_prelude::*};
 
 const NODE_KIND_PARAM_LIST: &str = "parameter_list";
@@ -297,16 +298,20 @@ fn extract_text<'a>(
         // For the happy path, raw snippets, no extra allocations!
         SnippetMethod::Raw => Cow::from(content),
         // Any modification will require a new vector.
-        SnippetMethod::Normalized(tf) => transform(tf, context, content).pipe(Cow::from),
+        SnippetMethod::Normalized(tf) => transform(tf, context, content),
     }
 }
 
 #[tracing::instrument(skip_all)]
-fn transform(transform: SnippetTransform, context: &[Node<'_>], content: &[u8]) -> Vec<u8> {
+fn transform<'a>(
+    transform: SnippetTransform,
+    _context: &[Node<'_>],
+    content: &'a [u8],
+) -> Cow<'a, [u8]> {
     match transform {
         SnippetTransform::Code => todo!(),
         SnippetTransform::Comment => todo!(),
-        SnippetTransform::Space => todo!(),
+        SnippetTransform::Space => normalize_space(content),
     }
 }
 
