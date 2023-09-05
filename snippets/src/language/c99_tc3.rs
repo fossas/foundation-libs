@@ -309,8 +309,9 @@ fn transform<'a>(
     content: &'a [u8],
 ) -> Cow<'a, [u8]> {
     match transform {
-        SnippetTransform::Code => todo!(),
-        SnippetTransform::Comment => todo!(),
+        // We need to fill these out before MVP launch, but for now we'll move on.
+        SnippetTransform::Code => unimplemented!(),
+        SnippetTransform::Comment => unimplemented!(),
         SnippetTransform::Space => normalize_space(content),
     }
 }

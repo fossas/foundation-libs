@@ -35,7 +35,7 @@ use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use strum::{Display, EnumIter};
-use tap::{Conv, Pipe};
+use tap::Conv;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
