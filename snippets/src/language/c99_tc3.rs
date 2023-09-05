@@ -236,8 +236,6 @@ fn extract_context<'a>(
             let (delim, context) = traverse(node.walk(), Order::Pre)
                 .inspect(|node| inspect_node(node, content))
                 .filter(|node| node.is_named())
-                // .take_while_inclusive(|node| node.kind() != NODE_KIND_PARAM_LIST)
-                // .take_while(|node| node.kind() == NODE_KIND_COMMENT)
                 .fold_while((None, Vec::new()), |(delim, mut context), node| {
                     match node.kind() {
                         // The param list is the default delimiter,

@@ -135,10 +135,10 @@ pub trait Extractor {
 /// # The [`Method`] type
 ///
 /// [`Options::transforms`] is converted to [`Method`],
-/// always implicitly attaching [`Method::Raw`] which cannot be disabled.
+/// always implicitly attaching [`Method::Raw`].
 ///
 /// Specifically, an empty [`Options::transforms`] still results in [`Method::Raw`]
-/// fingerprints being provided.
+/// fingerprints being provided by default.
 ///
 /// # Examples
 ///
