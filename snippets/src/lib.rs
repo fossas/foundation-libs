@@ -18,9 +18,10 @@
 //! `lang-c99-tc3` | Enables support for C99 TC3 | Language
 //! `sha2-asm` | Enables hardware acceleration for SHA2 | Performance
 
+#![deny(clippy::invalid_regex)]
+
 use std::{
     borrow::Cow,
-    cmp::Ordering,
     marker::PhantomData,
     ops::{Range, RangeInclusive},
     str::Utf8Error,
@@ -34,7 +35,7 @@ use getset::{CopyGetters, Getters};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use strum::{Display, EnumIter};
-use tap::Pipe;
+use tap::Conv;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -55,7 +56,7 @@ pub mod impl_prelude {
         Error as ExtractorError, Extractor as SnippetExtractor, Kind as SnippetKind,
         Kinds as SnippetKinds, Language as SnippetLanguage, LanguageError,
         Location as SnippetLocation, Metadata as SnippetMetadata, Method as SnippetMethod,
-        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy,
+        Options as SnippetOptions, Snippet, Strategy as LanguageStrategy, Target as SnippetTarget,
         Transform as SnippetTransform, Transforms as SnippetTransforms,
     };
 }
@@ -107,13 +108,37 @@ pub trait Extractor {
 /// Options for extracting snippets.
 /// Options are constructed via the `Options::builder` method.
 ///
+/// # Best effort
+///
+/// Constructed combinations of options may not make sense.
+/// For example, a hypothetical future [`Target`] type may not ever have comments
+/// (imagine a `Target` that reports only a function name and a list of argument types for example),
+/// and therefore [`Transform::Comment`] may not make sense in the context of that target.
+///
+/// It is up to the snippet implementation what happens in this scenario.
+/// Consumers should not rely on any particular behavior here, and should expect to filter or handle
+/// any combination of skippets that the provided options allow.
+///
+/// By default the recommendation is that the implementation should emit a snippet for all combinations,
+/// and leave it up to consumers to decide what constitutes a duplicate snippet and de-duplicate as desired.
+///
+/// # Defaults and empty sets
+///
+/// With the exception of [`Options::transforms`], any empty set provided
+/// is replaced with the default set
+/// (as provided by the implementation of [`Default`] for [`Options`]).
+///
 /// By default, all kinds of snippet are extracted, and all normalizations are applied.
 /// Providing an empty set to [`Options::kinds`] is equivalent to the default set
 /// (namely, all [`Kind`]s).
 ///
-/// All options implicitly assume [`Method::Raw`]; it is not currently possible to disable
-/// this snippet extraction method. This means that providing an empty set of transforms
-/// (via [`Transforms::none`]) results in a collection of snippets extracted with [`Method::Raw`].
+/// # The [`Method`] type
+///
+/// [`Options::transforms`] is converted to [`Method`],
+/// always implicitly attaching [`Method::Raw`].
+///
+/// Specifically, an empty [`Options::transforms`] still results in [`Method::Raw`]
+/// fingerprints being provided by default.
 ///
 /// # Examples
 ///
@@ -122,6 +147,7 @@ pub trait Extractor {
 /// # use snippets::*;
 /// let options = Options::default();
 ///
+/// assert_eq!(options.targets(), Targets::full());
 /// assert_eq!(options.kinds(), Kinds::full());
 /// assert_eq!(options.transforms(), Transforms::full());
 /// ```
@@ -129,7 +155,7 @@ pub trait Extractor {
 /// Restricting the kinds of snippet extracted:
 /// ```
 /// # use snippets::*;
-/// let options = Options::new(Kind::Signature, Transforms::full());
+/// let options = Options::new(Target::Function, Kind::Signature, Transforms::full());
 /// assert!(options.kinds().contains(Kind::Signature));
 /// assert!(!options.kinds().contains(Kind::Body));
 /// assert!(!options.kinds().contains(Kind::Full));
@@ -138,7 +164,7 @@ pub trait Extractor {
 /// Restricting the transforms applied:
 /// ```
 /// # use snippets::*;
-/// let options = Options::new(Kinds::full(), Transform::Comment);
+/// let options = Options::new(Target::Function, Kinds::full(), Transform::Comment);
 /// assert!(options.transforms().contains(Transform::Comment));
 /// assert!(!options.transforms().contains(Transform::Space));
 /// ```
@@ -146,51 +172,73 @@ pub trait Extractor {
 /// Only use [`Method::Raw`]:
 /// ```
 /// # use snippets::*;
-/// let options = Options::new(Kinds::full(), Transforms::none());
+/// let options = Options::new(Target::Function, Kinds::full(), Transforms::none());
 /// assert!(options.transforms().is_empty());
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, CopyGetters)]
 #[getset(get_copy = "pub")]
 pub struct Options {
+    /// The target units of source code to extract as snippets.
+    targets: Targets,
+
     /// The kinds of snippet to extract.
     kinds: Kinds,
 
     /// The normalizations used to extract this snippet.
     transforms: Transforms,
+
+    /// Include the `raw` method.
+    /// Recommended for general use; disabling is mainly intended for tests.
+    include_raw: bool,
 }
 
 impl Options {
     /// Create a new set of options for a snippet extractor.
-    pub fn new(kinds: impl Into<Kinds>, transforms: impl Into<Transforms>) -> Self {
+    pub fn new(
+        targets: impl Into<Targets>,
+        kinds: impl Into<Kinds>,
+        transforms: impl Into<Transforms>,
+    ) -> Self {
         Self {
-            kinds: Self::non_empty_kinds(kinds),
+            targets: targets.conv::<Targets>().default_if_empty(),
+            kinds: kinds.conv::<Kinds>().default_if_empty(),
             transforms: transforms.into(),
+            include_raw: true,
+        }
+    }
+
+    /// Disable generating [`Method::Raw`] snippets.
+    pub fn disable_raw(self) -> Self {
+        Self {
+            include_raw: false,
+            ..self
         }
     }
 
     /// Report the cartesian product of the configured [`Kind`]s of snippets to extract
     /// with configured [`Method`]s to apply.
-    pub fn cartesian_product(&self) -> impl Iterator<Item = (Kind, Method)> {
-        self.kinds
-            .iter()
-            .cartesian_product(Method::iter(self.transforms))
-    }
-
-    fn non_empty_kinds(input: impl Into<Kinds>) -> Kinds {
-        let input = input.into();
-        if input.is_empty() {
-            Kinds::full()
-        } else {
-            input
-        }
+    pub fn cartesian_product(&self) -> impl Iterator<Item = (Target, Kind, Method)> {
+        let include_raw = self.include_raw;
+        itertools::iproduct!(
+            self.targets.iter(),
+            self.kinds.iter(),
+            Method::iter(self.transforms).filter(move |method| {
+                match method {
+                    Method::Raw => include_raw,
+                    _ => true,
+                }
+            })
+        )
     }
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
+            targets: Targets::full(),
             kinds: Kinds::full(),
             transforms: Transforms::full(),
+            include_raw: true,
         }
     }
 }
@@ -353,7 +401,7 @@ pub enum Strategy {
 }
 
 /// An extracted snippet from the given unit of source code.
-#[derive(Debug, Clone, Getters, CopyGetters, Index, Deref, Derivative)]
+#[derive(Clone, Getters, CopyGetters, Index, Deref, Derivative, TypedBuilder)]
 #[derivative(PartialOrd, Ord, PartialEq, Eq)]
 pub struct Snippet<L> {
     /// Metadata for the extracted snippet.
@@ -367,32 +415,44 @@ pub struct Snippet<L> {
     #[derivative(PartialOrd = "ignore", Ord = "ignore")]
     fingerprint: text::Buffer,
 
+    /// Reports the content that actually generated the fingerprint.
+    #[getset(get = "pub")]
+    #[derivative(PartialOrd = "ignore", Ord = "ignore", PartialEq = "ignore")]
+    content: text::Buffer,
+
     /// Used to disambiguate snippets by source language.
     ///
     /// Technically this is evaluated for ordering and equality,
     /// but `PhantomData<T>` is always equal to itself for both checks.
+    #[builder(default, setter(skip))]
     language: PhantomData<L>,
 }
 
 impl<L> Snippet<L> {
     /// Create a new snippet from the provided data.
     pub fn from(meta: Metadata, content: impl AsRef<[u8]>) -> Self {
-        text::fingerprint(&content).pipe(|fp| Self::new(meta, fp))
-    }
-
-    /// Create a new instance from the provided information.
-    pub fn new(metadata: Metadata, fingerprint: text::Buffer) -> Self {
-        Self {
-            metadata,
-            fingerprint,
-            language: PhantomData,
-        }
+        Self::builder()
+            .content(text::Buffer::new(content.as_ref()))
+            .fingerprint(text::fingerprint(content))
+            .metadata(meta)
+            .build()
     }
 }
 
 impl<L: Language> std::fmt::Display for Snippet<L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", L::display(), self.metadata)
+    }
+}
+
+impl<L: Language> std::fmt::Debug for Snippet<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Snippet")
+            .field("language", &L::display())
+            .field("metadata", &self.metadata)
+            .field("fingerprint", &self.fingerprint)
+            .field("content", &self.content)
+            .finish()
     }
 }
 
@@ -596,7 +656,7 @@ flags! {
     #[strum(serialize_all = "snake_case")]
     #[non_exhaustive]
     pub enum Kind: u8 {
-        /// The signature of the function.
+        /// The signature of the snippet.
         ///
         /// ```ignore
         /// fn say_happy_birthday(age: usize) -> String            // <- included
@@ -606,7 +666,7 @@ flags! {
         /// ```
         Signature,
 
-        /// The body of the function.
+        /// The body of the snippet.
         ///
         /// ```ignore
         /// fn say_happy_birthday(age: usize) -> String {          // <- omitted
@@ -615,7 +675,7 @@ flags! {
         /// ```
         Body,
 
-        /// Both signature and body.
+        /// Both signature and body in one snippet.
         ///
         /// ```ignore
         /// fn say_happy_birthday(age: usize) -> String {          // <- included
@@ -644,8 +704,14 @@ flags! {
 /// assert!(kinds.contains(Kind::Signature));
 /// assert!(kinds.contains(Kind::Body));
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Kinds(FlagSet<Kind>);
+
+impl Default for Kinds {
+    fn default() -> Self {
+        Self::full()
+    }
+}
 
 impl Kinds {
     /// Check whether a given [`Kind`] is in the set.
@@ -733,14 +799,14 @@ impl std::fmt::Display for Kinds {
 ///
 /// ```
 /// # use snippets::*;
-/// # let arbitrary_flagset = Transforms::from(Transform::Space);
-/// assert!(Method::Raw > Method::Normalized(arbitrary_flagset));
+/// # let arbitrary = Transform::Space;
+/// assert!(Method::Raw > Method::Normalized(arbitrary));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum Method {
     /// Generated from the text with the specified normalizations applied.
-    Normalized(Transforms),
+    Normalized(Transform),
 
     /// Generated from the text as written.
     ///
@@ -765,9 +831,21 @@ impl Method {
         if transforms.is_empty() {
             vec![Method::Raw]
         } else {
-            vec![Method::Raw, Method::Normalized(transforms)]
+            std::iter::once(Method::Raw)
+                .chain(transforms.iter().map(Method::Normalized))
+                .collect_vec()
         }
         .into_iter()
+    }
+}
+
+impl From<Option<Transform>> for Method {
+    fn from(value: Option<Transform>) -> Self {
+        if let Some(tf) = value {
+            Method::Normalized(tf)
+        } else {
+            Method::Raw
+        }
     }
 }
 
@@ -801,6 +879,25 @@ flags! {
     #[strum(serialize_all = "snake_case")]
     #[non_exhaustive]
     pub enum Transform: u8 {
+        /// Transform the text to have any comments removed and whitespace normalized.
+        /// Equivalent to [`Transform::Comment`] followed by [`Transform::Space`].
+        ///
+        /// # Example
+        ///
+        /// The original input:
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String {
+        ///   // TODO: make 'years' smart plural.
+        ///   println!("Happy birthday! You're {age} years old!");
+        /// }
+        /// ```
+        ///
+        /// Is normalized to this:
+        /// ```ignore
+        /// fn say_happy_birthday(age: usize) -> String { println!("Happy birthday! You're {age} years old!"); }
+        /// ```
+        Code,
+
         /// Generated with any comments removed. Exactly what constitutes a comment is up to the implementation
         /// of the [`Extractor`] for the language being analyzed.
         ///
@@ -844,79 +941,34 @@ flags! {
     }
 }
 
-impl Transform {
-    /// Scores each variant on its specificity order.
-    ///
-    /// Implemented manually for now, if we ever get lots of variant churn we can look into a macro.
-    /// The specific scores chosen should just ensure that combinations of normalizations compare
-    /// as desired to other combinations.
-    ///
-    /// This is by its nature inexact: there's not always a good way to obviously map
-    /// "A+B+C+D is better than B+C+E+F", but we'll do the best we can.
-    ///
-    /// Scores that are truly equivalent may be given equivalent scores.
-    fn score(self) -> usize {
-        match self {
-            Transform::Comment => 1,
-            Transform::Space => 2,
-        }
+/// The normalizations used to extract this snippet.
+///
+/// # Examples
+///
+/// Single [`Transform`] in the set:
+/// ```
+/// # use snippets::*;
+/// let transforms = Transforms::from(Transform::Space);
+/// assert!(transforms.contains(Transform::Space));
+/// ```
+///
+/// Multiple [`Transform`]s in the set:
+/// ```
+/// # use snippets::*;
+/// let transforms = Transforms::from(Transform::Space | Transform::Comment);
+/// assert!(transforms.contains(Transform::Space));
+/// assert!(transforms.contains(Transform::Comment));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Transforms(FlagSet<Transform>);
+
+impl Default for Transforms {
+    fn default() -> Self {
+        Self::full()
     }
 }
 
-/// The normalizations used to extract this snippet.
-///
-/// # Specificity order
-///
-/// As discussed on [`Transform`], flags are already ordered by specificity, such that higher
-/// specificity flags are ordered later in a collection.
-///
-/// For [`Transforms`] (this type), it's a little different. Since the goal of "specificity order"
-/// is to sort snippets higher that are _less modified_ from the original source code,
-/// this type is ordered such that:
-/// - If there is a single [`Transform`] in compared sets, they're sorted as usual.
-/// - If there are multiple [`Transform`]s in compared sets, sets with fewer members are higher specificity.
-/// - For sets with the same number of members, sets are compared with the scores of their composite variants.
-///
-/// This works because in this case "more flags" means "more normalizations applied to the source",
-/// which means that they are _less_ specific. Meanwhile, if the count of flags are equal,
-/// the flags used can be extracted and compared by their score.
-///
-/// To give examples using [`Transform`]
-/// (assume a third pretend variant "Other" and pretend it is lower specificity than "Comment"):
-/// - `[Space] > [Comment]`: same as standalone.
-/// - `[Comment] > [Space,Comment]`: fewer modifications.
-/// - `[Space,Comment] > [Comment,Other]`: the score of "Space+Comment" is higher than "Comment+Other".
-///
-/// Scores are set based on the specificity of the variant.
-/// For example, [`Transform::Comment`] is scored `1`, as the lowest specificity;
-/// meanwhile [`Transform::Space`] is scored `2` as the next lowest specificity,
-/// and so on.
-/// Specific score values are not meaningful other than as a non-durable comparison to one another.
-///
-/// # Application order
-///
-/// The order that combinations of flags are applied matters: for instance, note the example for
-/// [`Transform::Space`] creates a syntax error, and the entire function body
-/// would be removed if it was performed before [`Transform::Comment`].
-///
-/// The application order is therefore up to the implementation of [`Extractor`];
-/// users are only able to specify which normalizations are performed.
-///
-/// It also follows that implementations of [`Extractor`] do not necessarily obey
-/// the specificity order of normalizations when applying normalizations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Transforms(FlagSet<Transform>);
-
 impl Transforms {
-    /// Scores each variant in self on its specificity order,
-    /// returning the summed score and the count of applied normalizations.
-    fn score_count(self) -> (usize, usize) {
-        self.0
-            .into_iter()
-            .map(Transform::score)
-            .fold((0, 0), |(prev, len), score| (prev + score, len + 1))
-    }
-
     /// Check whether a given [`Transform`] is in the set.
     ///
     /// # Example
@@ -990,27 +1042,6 @@ impl std::fmt::Display for Transforms {
     }
 }
 
-impl PartialOrd for Transforms {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Transforms {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let (self_score, self_len) = self.score_count();
-        let (other_score, other_len) = other.score_count();
-        match self_len.cmp(&other_len) {
-            // Fewer normalizations in set; higher specificity.
-            Ordering::Less => Ordering::Greater,
-            // More normalizations in set; lower specificity.
-            Ordering::Greater => Ordering::Less,
-            // Equal count of normalizations in set; order by score.
-            Ordering::Equal => self_score.cmp(&other_score),
-        }
-    }
-}
-
 impl From<FlagSet<Transform>> for Transforms {
     fn from(value: FlagSet<Transform>) -> Self {
         Self(value)
@@ -1020,6 +1051,150 @@ impl From<FlagSet<Transform>> for Transforms {
 impl From<Transform> for Transforms {
     fn from(value: Transform) -> Self {
         Self(value.into())
+    }
+}
+
+impl From<Option<Transform>> for Transforms {
+    fn from(value: Option<Transform>) -> Self {
+        if let Some(tf) = value {
+            tf.into()
+        } else {
+            Transforms::none()
+        }
+    }
+}
+
+flags! {
+    /// The targets of snippets to extract.
+    ///
+    /// # Specificity order
+    ///
+    /// Specificity is in the order specified by the implementation of [`Ord`] for this type.
+    /// Currently only one variant exists, but the idea is similar to that of [`Kind`] or [`Transform`]:
+    /// the more exact and meaningful the snippet target, the higher specificity.
+    ///
+    /// Items with higher "specificity order" are sorted _higher_; meaning that a
+    /// higher specificity variant is sorted later in a vector
+    /// than a lower specificity variant.
+    #[derive(Hash, PartialOrd, Ord, EnumIter, Display)]
+    #[strum(serialize_all = "snake_case")]
+    #[non_exhaustive]
+    pub enum Target: u8 {
+        /// Targets function defintions as snippets.
+        Function,
+    }
+}
+
+/// The targets of snippet to extract.
+///
+/// # Examples
+///
+/// Single [`Target`] in the set:
+/// ```
+/// # use snippets::*;
+/// let targets = Targets::from(Target::Function);
+/// assert!(targets.contains(Target::Function));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Targets(FlagSet<Target>);
+
+impl Default for Targets {
+    fn default() -> Self {
+        Self::full()
+    }
+}
+
+impl Targets {
+    /// Target function declarations as snippets.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let targets = Targets::from(Target::Function);
+    /// assert!(targets.contains(Target::Function));
+    /// ```
+    pub fn contains(&self, target: Target) -> bool {
+        self.0.contains(target)
+    }
+
+    /// Check whether the set is empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let targets = Targets::from(Target::Function);
+    /// assert!(!targets.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Create a new set of all [`Target`]s.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use snippets::*;
+    /// let targets = Targets::full();
+    /// assert!(targets.contains(Target::Function));
+    /// ```
+    pub fn full() -> Self {
+        Self(FlagSet::full())
+    }
+
+    /// Iterate over the [`Target`]s in the set.
+    pub fn iter(&self) -> impl Iterator<Item = Target> + Clone {
+        self.0.into_iter()
+    }
+}
+
+impl From<FlagSet<Target>> for Targets {
+    fn from(value: FlagSet<Target>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Target> for Targets {
+    fn from(value: Target) -> Self {
+        Self(value.into())
+    }
+}
+
+impl std::fmt::Display for Targets {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let targets = self
+            .iter()
+            .sorted_unstable()
+            .map(|t| t.to_string())
+            .collect_vec()
+            .join(",");
+        write!(f, "{targets}")
+    }
+}
+
+impl DefaultIfEmpty for Targets {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+impl DefaultIfEmpty for Kinds {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+trait DefaultIfEmpty: Default {
+    fn is_empty(&self) -> bool;
+
+    fn default_if_empty(self) -> Self {
+        if self.is_empty() {
+            Self::default()
+        } else {
+            self
+        }
     }
 }
 
@@ -1037,11 +1212,11 @@ mod tests {
 
     #[test]
     fn specificity_order_method() {
-        let arbitrary_flags = Transforms(Transform::Space | Transform::Comment);
-        let mut input = vec![Method::Raw, Method::Normalized(arbitrary_flags)];
+        let arbitrary = Transform::Space;
+        let mut input = vec![Method::Raw, Method::Normalized(arbitrary)];
         input.sort_unstable();
 
-        let expected = vec![Method::Normalized(arbitrary_flags), Method::Raw];
+        let expected = vec![Method::Normalized(arbitrary), Method::Raw];
         assert_eq!(input, expected);
     }
 
@@ -1055,14 +1230,14 @@ mod tests {
     #[test]
     fn specificity_order_normalizations() {
         let mut input = vec![
-            Transforms(FlagSet::from(Transform::Comment)),
-            Transforms(Transform::Space | Transform::Comment),
-            Transforms(FlagSet::from(Transform::Space)),
+            Method::Normalized(Transform::Comment),
+            Method::Normalized(Transform::Code),
+            Method::Normalized(Transform::Space),
         ];
         let expected = vec![
-            Transforms(Transform::Space | Transform::Comment),
-            Transforms(FlagSet::from(Transform::Comment)),
-            Transforms(FlagSet::from(Transform::Space)),
+            Method::Normalized(Transform::Code),
+            Method::Normalized(Transform::Comment),
+            Method::Normalized(Transform::Space),
         ];
 
         input.sort_unstable();
@@ -1080,32 +1255,6 @@ mod tests {
         assert_eq!(got, "int main()");
 
         Ok(())
-    }
-
-    #[test]
-    fn normalizations_count() {
-        let scores = [
-            (FlagSet::from(Transform::Comment), 1),
-            (FlagSet::from(Transform::Space), 1),
-            (Transform::Comment | Transform::Space, 2),
-        ];
-        for (set, expected) in scores {
-            let (_, len) = Transforms(set).score_count();
-            assert_eq!(len, expected, "set: {set:?}");
-        }
-    }
-
-    #[test]
-    fn normalizations_score() {
-        let scores = [
-            (FlagSet::from(Transform::Comment), 1),
-            (FlagSet::from(Transform::Space), 2),
-            (Transform::Comment | Transform::Space, 3),
-        ];
-        for (set, expected) in scores {
-            let (score, _) = Transforms(set).score_count();
-            assert_eq!(score, expected, "set: {set:?}");
-        }
     }
 
     #[test]
