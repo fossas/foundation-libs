@@ -71,7 +71,9 @@ fn parse_with_org() {
 
     for (fetcher, org, project, revision) in izip!(fetchers, orgs, projects, revisions) {
         let input = format!("{fetcher}+{org}/{project}{revision}");
-        let Ok(parsed) = Locator::parse(&input) else { panic!("must parse '{input}'") };
+        let Ok(parsed) = Locator::parse(&input) else {
+            panic!("must parse '{input}'")
+        };
 
         assert_eq!(
             parsed.fetcher().to_string(),
@@ -189,7 +191,7 @@ fn serde_deserialization() {
 /// - Contains at least one character that is not a control character and not the literal `$`
 /// - Contains a literal `$`
 /// - Contains at least one character that is not a control character and not the literal `$`
-const VALID_INPUTS_GIT: &str = r#"git\+[^\pC$]+\$[^\pC$]+"#;
+const VALID_INPUTS_GIT: &str = r"git\+[^\pC$]+\$[^\pC$]+";
 
 proptest! {
     /// Tests randomly generated strings that match the provided regular expression against the parser.
@@ -209,7 +211,7 @@ proptest! {
 /// - Contains at least one character that is not a control character and not the literal `$`
 /// - Contains a literal `$`
 /// - Contains at least one character that is not a control character and not the literal `$`
-const VALID_INPUTS_GIT_WITH_ORG: &str = r#"git\+/\d*/[^\pC$]+\$[^\pC$]+"#;
+const VALID_INPUTS_GIT_WITH_ORG: &str = r"git\+/\d*/[^\pC$]+\$[^\pC$]+";
 
 proptest! {
     /// Tests randomly generated strings that match the provided regular expression against the parser.
@@ -226,7 +228,7 @@ proptest! {
 /// - Contains at least one character that is not a control character and not the literal `$`
 /// - Contains a literal `$`
 /// - Contains at least one character that is not a control character and not the literal `$`
-const VALID_INPUTS_CUSTOM: &str = r#"custom\+[^\pC$]+\$[^\pC$]+"#;
+const VALID_INPUTS_CUSTOM: &str = r"custom\+[^\pC$]+\$[^\pC$]+";
 
 proptest! {
     /// Tests randomly generated strings that match the provided regular expression against the parser.
@@ -246,7 +248,7 @@ proptest! {
 /// - Contains at least one character that is not a control character and not the literal `$`
 /// - Contains a literal `$`
 /// - Contains at least one character that is not a control character and not the literal `$`
-const VALID_INPUTS_CUSTOM_WITH_ORG: &str = r#"custom\+/\d*/[^\pC$]+\$[^\pC$]+"#;
+const VALID_INPUTS_CUSTOM_WITH_ORG: &str = r"custom\+/\d*/[^\pC$]+\$[^\pC$]+";
 
 proptest! {
     /// Tests randomly generated strings that match the provided regular expression against the parser.

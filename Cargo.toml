@@ -10,8 +10,7 @@ members = [
   "vsi",
 ]
 
-[profile.dev.package.backtrace]
-opt-level = 3
+resolver = "2"
 
 [profile.release]
 lto = "fat"

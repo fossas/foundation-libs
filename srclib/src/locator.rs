@@ -134,7 +134,7 @@ impl Locator {
     pub fn parse(locator: &str) -> Result<Self, Error> {
         lazy_static! {
             static ref RE: Regex = Regex::new(
-                r#"^(?:(?P<fetcher>[a-z-]+)\+|)(?P<project>[^$]+)(?:\$|)(?P<revision>.+|)$"#
+                r"^(?:(?P<fetcher>[a-z-]+)\+|)(?P<project>[^$]+)(?:\$|)(?P<revision>.+|)$"
             )
             .expect("Locator parsing expression must compile");
         }
@@ -430,7 +430,7 @@ pub enum ProjectParseError {
 /// Optionally parse an org ID and trimmed project out of a project string.
 fn parse_org_project(project: &str) -> Result<(Option<usize>, &str), ProjectParseError> {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r#"^(?:(?P<org_id>\d+)/)?(?P<project>.+)"#)
+        static ref RE: Regex = Regex::new(r"^(?:(?P<org_id>\d+)/)?(?P<project>.+)")
             .expect("Project parsing expression must compile");
     }
 
@@ -474,7 +474,9 @@ mod tests {
 
         for (org, name) in izip!(orgs, names) {
             let test = format!("{org}/{name}");
-            let Ok((Some(org_id), project)) = parse_org_project(&test) else { panic!("must parse '{test}'") };
+            let Ok((Some(org_id), project)) = parse_org_project(&test) else {
+                panic!("must parse '{test}'")
+            };
             assert_eq!(org_id, org, "'org_id' must match in '{test}'");
             assert_eq!(project, name, "'project' must match in '{test}");
         }
@@ -484,7 +486,9 @@ mod tests {
     fn parses_org_project_no_org() {
         let names = ["/name/foo", "/name", "abcd/1234/name", "1abc2/name"];
         for test in names {
-            let Ok((org_id, project)) = parse_org_project(test) else { panic!("must parse '{test}'") };
+            let Ok((org_id, project)) = parse_org_project(test) else {
+                panic!("must parse '{test}'")
+            };
             assert_eq!(org_id, None, "'org_id' must be None in '{test}'");
             assert_eq!(project, test, "'project' must match in '{test}");
         }
