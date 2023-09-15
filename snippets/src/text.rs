@@ -24,6 +24,6 @@ pub fn fingerprint(input: impl AsRef<[u8]>) -> Buffer {
 }
 
 /// Given a buffer, produce a base64 representation of its contents.
-pub fn as_base64(input: &[u8]) -> String {
+pub fn as_base64(input: impl AsRef<[u8]>) -> String {
     base64::engine::general_purpose::STANDARD_NO_PAD.encode(input)
 }
