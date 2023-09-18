@@ -59,6 +59,23 @@ impl Buffer {
             .map_err(Error::from)
             .map(Self::new)
     }
+
+    /// Read the buffer as a `Vec<u8>`.
+    pub fn as_bytes(&self) -> &[u8] {
+        match &self.encoding {
+            Encoding::Bytes(v) => v,
+            Encoding::UTF8(s) => s.as_bytes(),
+        }
+    }
+
+    /// Read the buffer as a `String`.
+    /// If the buffer isn't a valid string already, returns the base64 encoded equivalent.
+    pub fn as_utf8(&self) -> Cow<'_, str> {
+        match &self.encoding {
+            Encoding::Bytes(v) => as_base64(v).pipe(Cow::from),
+            Encoding::UTF8(s) => Cow::from(s),
+        }
+    }
 }
 
 impl std::fmt::Display for Buffer {
