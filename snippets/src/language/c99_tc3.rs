@@ -39,10 +39,7 @@ use tree_sitter_traversal::{traverse, traverse_tree, Order};
 use crate::debugging::ToDisplayEscaped;
 use crate::text::normalize_space;
 use crate::{impl_language, impl_prelude::*};
-
-const NODE_KIND_PARAM_LIST: &str = "parameter_list";
-const NODE_KIND_COMMENT: &str = "comment";
-const NODE_KIND_FUNC_DEF: &str = "function_definition";
+use crate::tree_sitter_consts::{NODE_KIND_PARAM_LIST, NODE_KIND_FUNC_DEF, NODE_KIND_COMMENT};
 
 /// This module implements support for C99 TC3.
 ///
@@ -240,14 +237,14 @@ fn extract_context<'a>(
                     match node.kind() {
                         // The param list is the default delimiter,
                         // but keep going after it's found to handle comments.
-                        NODE_KIND_PARAM_LIST => {
+                        node_kind if node_kind == NODE_KIND_PARAM_LIST => {
                             context.push(node);
                             (Some(node), context).pipe(FoldWhile::Continue)
                         }
                         // If there are comments immediately after the param list,
                         // set them as the delimiter instead.
                         // Keep going to handle multiple comments after the param list.
-                        NODE_KIND_COMMENT if delim.is_some() => {
+                        node_kind if node_kind == NODE_KIND_COMMENT && delim.is_some() => {
                             context.push(node);
                             (Some(node), context).pipe(FoldWhile::Continue)
                         }
