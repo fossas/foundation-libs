@@ -30,6 +30,7 @@
 
 use std::borrow::Cow;
 
+use getset::Getters;
 use itertools::{FoldWhile, Itertools};
 use tap::{Pipe, Tap};
 use tracing::{debug, warn};
@@ -53,7 +54,6 @@ impl SnippetLanguage for Language {
     const NAME: &'static str = "c99_tc3";
     const STRATEGY: LanguageStrategy = LanguageStrategy::Static;
 }
-
 impl_language!(Language);
 
 /// Supports extracting snippets from C99 TC3 source code.
@@ -143,6 +143,57 @@ fn extract_function<L>(
         .pipe(Ok)
         .pipe(Some)
 }
+
+/// This structure represents a view into a larger piece of parsed text.
+/// For snippet scanning, we generally look at just parts of a larger piece of text for each snippet.
+/// However, the parsed nodes all reference locations in the original text.
+/// This structure is meant to make it easier to find content inside a snippet based on previously extracted nodes.
+#[derive(Debug, PartialEq, Getters)]
+pub struct SnippetContext<'a> {
+    offset: usize,
+    /// The location in the original text of this snippet.
+    #[getset(get)]
+    location: SnippetLocation,
+    /// The nodes that have been parsed from this context.
+    #[getset(get)]
+    context_nodes: Vec<Node<'a>>,
+    #[getset(get)]
+    content: &'a [u8]
+}
+
+impl<'a> SnippetContext<'a> {
+    /// Make a new SnippetContext from a sequence of nodes, a location within the original parsed text, and a sequence of bytes for data inside the snippet.
+    pub fn new(context_nodes: Vec<Node<'a>>, location: SnippetLocation, content: &'a [u8]) -> Self {
+        let crate::ByteOffset(offset) = location.byte_offset;
+        SnippetContext{
+            offset, context_nodes, location, content
+        }
+    }
+
+    // /// Given a Node, retrieve a slice with the correct offsets applied.
+    // pub fn retrieve_node_content<'b>(&self, node: &'b Node) -> &'a [u8]{
+    //     &self.content[node.start_byte() - self.offset .. node.end_byte() - self.offset]
+    // }
+
+    /// Get content from the snippet which is not in the nodes.
+    pub fn retrieve_negative_content<'b>(&self, nodes: impl Iterator<Item=&'b Node<'b>>) -> Vec<&'a [u8]>{
+       let mut start_byte = 0;
+       let mut slices = Vec::new();
+
+       // Find every non-comment section of text from the original content into a sequence
+       for node in nodes {
+           let end_byte = node.start_byte() - self.offset;
+           let next_start_byte = node.end_byte() - self.offset;
+           slices.push(&self.content[start_byte..end_byte]);
+           start_byte = next_start_byte;
+       }
+
+       slices.push(&self.content[start_byte..self.content.len()]);
+
+       slices
+    }
+}
+
 
 /// Extracts the "context" of a node with the provided metadata.
 ///

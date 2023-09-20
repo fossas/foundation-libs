@@ -621,21 +621,6 @@ impl From<RangeInclusive<usize>> for Location {
     }
 }
 
-// /// This structure contains a collection of Nodes parsed from some text as well as a location which
-// #[derive(Debug, PartialEq)]
-// pub struct SnippetContext<'a> {
-//     nodes: Vec<Node<'a>>,
-//     location: Location
-// }
-
-// impl SnippetContext {
-//     fn new(nodes: Vec<_>, location: Location) -> Self {
-//         SnippetContext{
-//             nodes, location
-//         }
-//     }
-// }
-
 /// The byte offset at which the snippet began.
 ///
 /// Zero-based, meaning that if the snippet begins on the first byte of the file,
