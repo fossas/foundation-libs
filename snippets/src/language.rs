@@ -5,3 +5,5 @@
 
 #[cfg(feature = "lang-c99-tc3")]
 pub mod c99_tc3;
+
+mod normalize_comments;

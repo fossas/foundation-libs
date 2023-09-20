@@ -4,6 +4,7 @@ use snippets::{
     language::c99_tc3, Extractor, Kind, Location, Metadata, Method, Options, Snippet, Target,
     Transform, Transforms,
 };
+use tracing::debug;
 
 use crate::include_str_lf;
 
@@ -206,6 +207,38 @@ fn body_raw_hello_world_comment() {
     let expected = vec![Snippet::from(
         Metadata::new(kind, transform.into(), span),
         span.extract_from(content.as_bytes()),
+    )];
+
+    assert_eq!(extract, expected);
+}
+
+#[test]
+fn body_comment_hello_world_comment() {
+    crate::tracing::setup();
+
+    let kind = Kind::Full;
+    let transform = Some(Transform::Comment);
+    let span = Location::from(84..1336);
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected_content = r#"int  main  () 
+{ 
+  
+
+  
+  printf("hello world\n"  ); 
+
+ return  0 ;
+
+   }"#;
+
+    //include_str_lf!("testdata/c99_tc3/hello_world_comment_comment_normalized.c");
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        expected_content.as_bytes(),
     )];
 
     assert_eq!(extract, expected);
