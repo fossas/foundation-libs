@@ -4,7 +4,6 @@ use snippets::{
     language::c99_tc3, Extractor, Kind, Location, Metadata, Method, Options, Snippet, Target,
     Transform, Transforms,
 };
-use tracing::debug;
 
 use crate::include_str_lf;
 
@@ -235,7 +234,6 @@ fn body_comment_hello_world_comment() {
 
    }"#;
 
-    //include_str_lf!("testdata/c99_tc3/hello_world_comment_comment_normalized.c");
     let expected = vec![Snippet::from(
         Metadata::new(kind, transform.into(), span),
         expected_content.as_bytes(),

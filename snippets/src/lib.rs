@@ -37,6 +37,7 @@ use once_cell::sync::OnceCell;
 use strum::{Display, EnumIter};
 use tap::Conv;
 use thiserror::Error;
+
 use typed_builder::TypedBuilder;
 
 pub mod debugging;
@@ -619,6 +620,21 @@ impl From<RangeInclusive<usize>> for Location {
         }
     }
 }
+
+// /// This structure contains a collection of Nodes parsed from some text as well as a location which
+// #[derive(Debug, PartialEq)]
+// pub struct SnippetContext<'a> {
+//     nodes: Vec<Node<'a>>,
+//     location: Location
+// }
+
+// impl SnippetContext {
+//     fn new(nodes: Vec<_>, location: Location) -> Self {
+//         SnippetContext{
+//             nodes, location
+//         }
+//     }
+// }
 
 /// The byte offset at which the snippet began.
 ///
