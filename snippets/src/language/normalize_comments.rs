@@ -1,7 +1,7 @@
 use crate::tree_sitter_consts::NODE_KIND_COMMENT;
 use std::borrow::Cow;
 
-use super::context::SnippetContext;
+use super::snippet_context::SnippetContext;
 
 /// Remove all comment node text from the given content.
 /// In general, this function should work in any language that produces "comment" type nodes from tree_sitter.
@@ -23,7 +23,7 @@ pub fn normalize_comments<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
 mod tests {
 
     use crate::impl_prelude::SnippetLocation;
-    use crate::language::context::SnippetContext;
+    use crate::language::snippet_context::SnippetContext;
     use tree_sitter_traversal::{traverse_tree, Order};
 
     #[cfg(feature = "lang-c99-tc3")]
