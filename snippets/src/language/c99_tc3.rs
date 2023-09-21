@@ -335,7 +335,7 @@ fn extract_context<'a>(
 #[tracing::instrument(skip_all)]
 fn extract_text<'a>(
     method: SnippetMethod,
-    context: &SnippetContext<'a>
+    context: &'a SnippetContext
 ) -> Cow<'a, [u8]> {
     match method {
         // For the happy path, raw snippets, no extra allocations!
@@ -348,7 +348,7 @@ fn extract_text<'a>(
 #[tracing::instrument(skip_all)]
 fn transform<'a>(
     transform: SnippetTransform,
-    context: &SnippetContext<'a>
+    context: &'a SnippetContext
 ) -> Cow<'a, [u8]> {
     match transform {
         // We need to fill these out before MVP launch, but for now we'll move on.
