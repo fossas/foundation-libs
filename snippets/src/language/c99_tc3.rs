@@ -30,7 +30,6 @@
 
 use std::borrow::Cow;
 
-use getset::{Getters, CopyGetters};
 use itertools::{FoldWhile, Itertools};
 use tap::{Pipe, Tap};
 use tracing::{debug, warn};
@@ -42,6 +41,7 @@ use crate::text::normalize_space;
 use crate::tree_sitter_consts::{NODE_KIND_COMMENT, NODE_KIND_FUNC_DEF, NODE_KIND_PARAM_LIST};
 use crate::{impl_language, impl_prelude::*};
 
+use super::context::SnippetContext;
 use super::normalize_comments::normalize_comments;
 
 /// This module implements support for C99 TC3.
@@ -144,53 +144,6 @@ fn extract_function<L>(
         .pipe(Some)
 }
 
-/// This structure represents a view into a larger piece of parsed text.
-/// For snippet scanning, we generally look at just parts of a larger piece of text for each snippet.
-/// However, the parsed nodes all reference locations in the original text.
-/// This structure is meant to make it easier to find content inside a snippet based on previously extracted nodes.
-#[derive(Debug, PartialEq, Getters, CopyGetters)]
-pub struct SnippetContext<'a> {
-    offset: usize,
-    /// The location in the original text of this snippet.
-    #[getset(get = "pub")]
-    location: SnippetLocation,
-    /// The nodes that have been parsed from this context.
-    #[getset(get = "pub")]
-    context_nodes: Vec<Node<'a>>,
-    #[getset(get_copy = "pub")]
-    content: &'a [u8]
-}
-
-impl<'a> SnippetContext<'a> {
-    /// Make a new SnippetContext from a sequence of nodes, a location within the original parsed text, and a sequence of bytes for data inside the snippet.
-    /// There is no checking or guarantee that the provided nodes fall within the bounds of the provided content.
-    pub fn new(context_nodes: Vec<Node<'a>>, location: SnippetLocation, content: &'a [u8]) -> Self {
-        let crate::ByteOffset(offset) = location.byte_offset;
-        SnippetContext{
-            offset, context_nodes, location, content
-        }
-    }
-
-    /// Get content from the snippet which is not in ranges covered by the provided nodes.
-    pub fn retrieve_negative_content(&self, nodes: impl Iterator<Item=&'a Node<'a>>) -> impl Iterator<Item = &'a [u8]>{
-       let mut start_byte = 0;
-       let mut slices = Vec::new();
-
-       // Find every non-comment section of text from the original content into a sequence
-       for node in nodes {
-           let end_byte = node.start_byte() - self.offset;
-           let next_start_byte = node.end_byte() - self.offset;
-           slices.push(&self.content[start_byte..end_byte]);
-           start_byte = next_start_byte;
-       }
-
-       slices.push(&self.content[start_byte..self.content.len()]);
-
-       slices.into_iter()
-    }
-}
-
-
 /// Extracts the "context" of a node with the provided metadata.
 ///
 /// This consists of:
@@ -213,7 +166,11 @@ fn extract_context<'a>(
         SnippetKind::Full => {
             let context = traverse(node.walk(), Order::Pre).collect();
             let location = meta.location();
-            Some(SnippetContext::new(context, location, location.extract_from(content)))
+            Some(SnippetContext::new(
+                context,
+                location,
+                location.extract_from(content),
+            ))
         }
         SnippetKind::Body => {
             // This node starts at the start of the function,
@@ -333,10 +290,7 @@ fn extract_context<'a>(
 }
 
 #[tracing::instrument(skip_all)]
-fn extract_text<'a>(
-    method: SnippetMethod,
-    context: &'a SnippetContext
-) -> Cow<'a, [u8]> {
+fn extract_text<'a>(method: SnippetMethod, context: &'a SnippetContext) -> Cow<'a, [u8]> {
     match method {
         // For the happy path, raw snippets, no extra allocations!
         SnippetMethod::Raw => Cow::from(context.content()),
@@ -346,10 +300,7 @@ fn extract_text<'a>(
 }
 
 #[tracing::instrument(skip_all)]
-fn transform<'a>(
-    transform: SnippetTransform,
-    context: &'a SnippetContext
-) -> Cow<'a, [u8]> {
+fn transform<'a>(transform: SnippetTransform, context: &'a SnippetContext) -> Cow<'a, [u8]> {
     match transform {
         // We need to fill these out before MVP launch, but for now we'll move on.
         SnippetTransform::Code => unimplemented!(),
