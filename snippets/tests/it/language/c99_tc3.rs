@@ -221,7 +221,7 @@ fn full_comment_hello_world_comment() {
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
-    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected_content = r#"int  main  () 
 { 
@@ -252,7 +252,7 @@ fn signature_comment_hello_world_comment() {
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
-    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected_content = r#"int  main  () "#;
 
@@ -274,7 +274,7 @@ fn body_comment_hello_world_comment() {
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
-    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected_content = r#"{ 
   
@@ -304,7 +304,7 @@ fn full_code_hello_world_comment() {
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
-    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected_content = r#"int main () { printf("hello world\n" ); return 0 ; }"#;
 
@@ -326,7 +326,7 @@ fn signature_code_hello_world_comment() {
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
-    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected_content = r#"int main () "#;
 
@@ -348,7 +348,7 @@ fn body_code_hello_world_comment() {
 
     let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
-    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
 
     let expected_content = r#"{ printf("hello world\n" ); return 0 ; }"#;
 
