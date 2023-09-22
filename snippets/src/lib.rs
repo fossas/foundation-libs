@@ -37,7 +37,6 @@ use once_cell::sync::OnceCell;
 use strum::{Display, EnumIter};
 use tap::Conv;
 use thiserror::Error;
-
 use typed_builder::TypedBuilder;
 
 pub mod debugging;
