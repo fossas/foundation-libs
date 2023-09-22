@@ -41,6 +41,7 @@ use crate::text::normalize_space;
 use crate::tree_sitter_consts::{NODE_KIND_COMMENT, NODE_KIND_FUNC_DEF, NODE_KIND_PARAM_LIST};
 use crate::{impl_language, impl_prelude::*};
 
+use super::normalize_code::normalize_code;
 use super::snippet_context::SnippetContext;
 use super::normalize_comments::normalize_comments;
 
@@ -303,7 +304,7 @@ fn extract_text<'a>(method: SnippetMethod, context: &'a SnippetContext) -> Cow<'
 fn transform<'a>(transform: SnippetTransform, context: &'a SnippetContext) -> Cow<'a, [u8]> {
     match transform {
         // We need to fill these out before MVP launch, but for now we'll move on.
-        SnippetTransform::Code => unimplemented!(),
+        SnippetTransform::Code => normalize_code(context),
         SnippetTransform::Comment => normalize_comments(context),
         SnippetTransform::Space => normalize_space(context.content()),
     }
