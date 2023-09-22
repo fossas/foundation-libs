@@ -9,7 +9,7 @@ use super::snippet_context::SnippetContext;
 pub fn normalize_comments<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
     let comment_nodes = context
         .context_nodes()
-        .into_iter()
+        .iter()
         .filter(|n| n.kind() == NODE_KIND_COMMENT);
 
     context

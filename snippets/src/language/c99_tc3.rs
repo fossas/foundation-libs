@@ -42,8 +42,8 @@ use crate::tree_sitter_consts::{NODE_KIND_COMMENT, NODE_KIND_FUNC_DEF, NODE_KIND
 use crate::{impl_language, impl_prelude::*};
 
 use super::normalize_code::normalize_code;
-use super::snippet_context::SnippetContext;
 use super::normalize_comments::normalize_comments;
+use super::snippet_context::SnippetContext;
 
 /// This module implements support for C99 TC3.
 ///

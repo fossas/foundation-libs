@@ -294,7 +294,6 @@ fn body_comment_hello_world_comment() {
     assert_eq!(extract, expected);
 }
 
-
 #[test]
 fn full_code_hello_world_comment() {
     crate::tracing::setup();
