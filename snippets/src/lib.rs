@@ -762,9 +762,18 @@ impl Kinds {
     }
 }
 
-impl From<FlagSet<Kind>> for Kinds {
-    fn from(value: FlagSet<Kind>) -> Self {
-        Self(value)
+impl<I: IntoIterator<Item = Kind>> From<I> for Kinds {
+    fn from(value: I) -> Self {
+        let mut value = value.into_iter();
+        if let Some(first) = value.next() {
+            let mut fs = FlagSet::from(first);
+            for flag in value {
+                fs |= flag;
+            }
+            Self(fs)
+        } else {
+            Self(FlagSet::default())
+        }
     }
 }
 
@@ -840,12 +849,13 @@ impl Method {
     }
 }
 
-impl From<Option<Transform>> for Method {
-    fn from(value: Option<Transform>) -> Self {
-        if let Some(tf) = value {
-            Method::Normalized(tf)
+impl<I: IntoIterator<Item = Transform>> From<I> for Method {
+    fn from(value: I) -> Self {
+        let mut value = value.into_iter();
+        if let Some(first) = value.next() {
+            Self::Normalized(first)
         } else {
-            Method::Raw
+            Self::Raw
         }
     }
 }
@@ -1043,25 +1053,24 @@ impl std::fmt::Display for Transforms {
     }
 }
 
-impl From<FlagSet<Transform>> for Transforms {
-    fn from(value: FlagSet<Transform>) -> Self {
-        Self(value)
+impl<I: IntoIterator<Item = Transform>> From<I> for Transforms {
+    fn from(value: I) -> Self {
+        let mut value = value.into_iter();
+        if let Some(first) = value.next() {
+            let mut fs = FlagSet::from(first);
+            for flag in value {
+                fs |= flag;
+            }
+            Self(fs)
+        } else {
+            Self(FlagSet::default())
+        }
     }
 }
 
 impl From<Transform> for Transforms {
     fn from(value: Transform) -> Self {
         Self(value.into())
-    }
-}
-
-impl From<Option<Transform>> for Transforms {
-    fn from(value: Option<Transform>) -> Self {
-        if let Some(tf) = value {
-            tf.into()
-        } else {
-            Transforms::none()
-        }
     }
 }
 
@@ -1151,9 +1160,18 @@ impl Targets {
     }
 }
 
-impl From<FlagSet<Target>> for Targets {
-    fn from(value: FlagSet<Target>) -> Self {
-        Self(value)
+impl<I: IntoIterator<Item = Target>> From<I> for Targets {
+    fn from(value: I) -> Self {
+        let mut value = value.into_iter();
+        if let Some(first) = value.next() {
+            let mut fs = FlagSet::from(first);
+            for flag in value {
+                fs |= flag;
+            }
+            Self(fs)
+        } else {
+            Self(FlagSet::default())
+        }
     }
 }
 
