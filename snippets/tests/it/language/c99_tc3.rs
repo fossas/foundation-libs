@@ -293,3 +293,70 @@ fn body_comment_hello_world_comment() {
 
     assert_eq!(extract, expected);
 }
+
+
+#[test]
+fn full_code_hello_world_comment() {
+    crate::tracing::setup();
+
+    let kind = Kind::Full;
+    let transform = Some(Transform::Code);
+    let span = Location::from(84..1336);
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected_content = r#"int main () { printf("hello world\n" ); return 0 ; }"#;
+
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        expected_content.as_bytes(),
+    )];
+
+    assert_eq!(extract, expected);
+}
+
+#[test]
+fn signature_code_hello_world_comment() {
+    crate::tracing::setup();
+
+    let kind = Kind::Signature;
+    let transform = Some(Transform::Code);
+    let span = Location::from(84..224);
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected_content = r#"int main () "#;
+
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        expected_content.as_bytes(),
+    )];
+
+    assert_eq!(extract, expected);
+}
+
+#[test]
+fn body_code_hello_world_comment() {
+    crate::tracing::setup();
+
+    let kind = Kind::Body;
+    let transform = Some(Transform::Code);
+    let span = Location::from(225..1336);
+
+    let content = include_str_lf!("testdata/c99_tc3/hello_world_comment.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, &content).expect("must set up parser");
+
+    let expected_content = r#"{ printf("hello world\n" ); return 0 ; }"#;
+
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        expected_content.as_bytes(),
+    )];
+
+    assert_eq!(extract, expected);
+}
