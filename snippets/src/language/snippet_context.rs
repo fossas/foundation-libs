@@ -41,7 +41,6 @@ impl<'a> SnippetContext<'a> {
         let mut start_byte = 0;
         let mut slices = Vec::new();
 
-        // Find every non-comment section of text from the original content into a sequence
         for node in nodes {
             let end_byte = node.start_byte() - self.offset;
             let next_start_byte = node.end_byte() - self.offset;

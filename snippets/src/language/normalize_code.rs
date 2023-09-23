@@ -8,8 +8,7 @@ use crate::text::normalize_space;
 /// Uses [`super::normalize_comments`] and [`crate::text::normalize_space`].
 #[tracing::instrument(skip_all)]
 pub fn normalize_code<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
-    let comments = normalize_comments(context);
-    Vec::from(normalize_space(comments.as_ref())).into()
+    Vec::from(normalize_space(normalize_comments(context).as_ref())).into()
 }
 
 #[cfg(test)]
