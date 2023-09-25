@@ -42,6 +42,7 @@ use typed_builder::TypedBuilder;
 pub mod debugging;
 pub mod language;
 pub mod text;
+mod tree_sitter_consts;
 
 /// Convenience import for all types that
 /// an implementation of [`Extractor`] would likely need.
