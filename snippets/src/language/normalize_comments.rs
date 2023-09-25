@@ -13,7 +13,7 @@ pub fn normalize_comments<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
         .filter(|n| n.kind() == NODE_KIND_COMMENT);
 
     context
-        .retrieve_negative_content(comment_nodes)
+        .retrieve_content_around_nodes(comment_nodes)
         .collect::<Vec<&'a [u8]>>()
         .concat()
         .into()

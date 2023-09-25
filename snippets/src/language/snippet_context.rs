@@ -34,7 +34,7 @@ impl<'a> SnippetContext<'a> {
     }
 
     /// Get content from the snippet which is not in ranges covered by the provided nodes.
-    pub fn retrieve_negative_content(
+    pub fn retrieve_content_around_nodes(
         &self,
         nodes: impl Iterator<Item = &'a Node<'a>>,
     ) -> impl Iterator<Item = &'a [u8]> {
