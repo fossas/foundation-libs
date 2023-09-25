@@ -1,5 +1,6 @@
 use crate::impl_prelude::SnippetLocation;
 use getset::{CopyGetters, Getters};
+use tracing::debug;
 use tree_sitter::Node;
 
 /// This structure represents a view into a larger piece of parsed text.
@@ -33,6 +34,45 @@ impl<'a> SnippetContext<'a> {
         }
     }
 
+    pub fn filter_nodes(&self, p: impl FnMut(&Node<'a>) -> bool) -> SnippetContext {
+        let new_nodes = self.context_nodes.iter().map(|i| i.clone());
+
+        SnippetContext::new(new_nodes.filter(p).collect(), self.location.clone(), self.content)
+    }
+
+    /// Return all content described by nodes in this context.
+    pub fn context_text(&self) -> Vec<u8> {
+        let mut slices = Vec::new();
+//        let mut last_start_byte = 0;
+        let mut last_end_byte = 0;
+
+        for n in self.context_nodes.iter() {
+            let next_start_byte = n.start_byte();
+            let end_byte = n.end_byte();
+
+            if end_byte < last_end_byte {
+                continue;
+            }
+            
+            let start_byte = if next_start_byte < last_end_byte {
+                last_end_byte
+            } else {
+                next_start_byte
+            };
+
+            print!("{} {}\n", start_byte, end_byte);
+            print!("Node type: {}\n", n.kind());
+            let slice = &self.content[start_byte .. end_byte - self.offset];
+            print!("slice: {}\n", std::str::from_utf8(slice).expect("oops"));
+            slices.push(slice);
+
+            //last_start_byte = start_byte;
+            last_end_byte = end_byte;
+        }
+
+        slices.concat()
+    }
+    
     /// Get content from the snippet which is not in ranges covered by the provided nodes.
     pub fn retrieve_content_around_nodes(
         &self,

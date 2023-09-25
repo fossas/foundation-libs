@@ -7,16 +7,7 @@ use super::snippet_context::SnippetContext;
 /// In general, this function should work in any language that produces "comment" type nodes from tree_sitter.
 #[tracing::instrument(skip_all)]
 pub fn normalize_comments<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
-    let comment_nodes = context
-        .context_nodes()
-        .iter()
-        .filter(|n| n.kind() == NODE_KIND_COMMENT);
-
-    context
-        .retrieve_content_around_nodes(comment_nodes)
-        .collect::<Vec<&'a [u8]>>()
-        .concat()
-        .into()
+    context.filter_nodes(|n| n.kind() != NODE_KIND_COMMENT).context_text().into()
 }
 
 #[cfg(test)]
