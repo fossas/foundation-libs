@@ -1,22 +1,16 @@
 use crate::tree_sitter_consts::NODE_KIND_COMMENT;
-use std::borrow::Cow;
 
 use super::snippet_context::SnippetContext;
 
 /// Remove all comment node text from the given content.
 /// In general, this function should work in any language for which treesitter produces nodes whose `kind` equals [`NODE_KIND_COMMENT`].
 #[tracing::instrument(skip_all)]
-pub fn normalize_comments<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
+pub fn normalize_comments<'a>(context: &'a SnippetContext) -> Vec<u8> {
     let comment_nodes = context
-        .context_nodes()
+        .nodes()
         .iter()
         .filter(|n| n.kind() == NODE_KIND_COMMENT);
-
-    context
-        .retrieve_content_around_nodes(comment_nodes)
-        .collect::<Vec<&'a [u8]>>()
-        .concat()
-        .into()
+    context.content_around(comment_nodes)
 }
 
 #[cfg(test)]
@@ -46,17 +40,17 @@ mod tests {
         parser
             .set_language(tree_sitter_c::language())
             .expect("Could not set language");
-        let tree = parser.parse(text, None).expect("Couldn't parse test text");
-        let nodes = traverse_tree(&tree, Order::Pre).collect();
 
-        let context = SnippetContext::new(
-            nodes,
+        let tree = parser.parse(text, None).expect("Couldn't parse test text");
+        let context = SnippetContext::from_nodes(
+            traverse_tree(&tree, Order::Pre),
             SnippetLocation::builder()
                 .byte_offset(0)
                 .byte_len(text.len())
                 .build(),
             text,
         );
+
         let out_text = super::normalize_comments(&context);
         assert_eq!(
             std::str::from_utf8(out_text.as_ref()).expect("Could not parse out text"),

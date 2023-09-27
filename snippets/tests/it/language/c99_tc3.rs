@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use snippets::{
-    language::c99_tc3, Extractor, Kind, Location, Metadata, Method, Options, Snippet, Target,
-    Transform, Transforms,
+    language::c99_tc3, Extractor, Kind, Kinds, Location, Metadata, Method, Options, Snippet,
+    Target, Targets, Transform, Transforms,
 };
 
 use crate::include_str_lf;
@@ -265,6 +265,48 @@ fn signature_comment_hello_world_comment() {
 }
 
 #[test]
+fn signature_comment_complicated() {
+    crate::tracing::setup();
+
+    let kind = Kind::Signature;
+    let transform = Some(Transform::Code);
+    let span = Location::from(100..510);
+
+    let content = include_str_lf!("testdata/c99_tc3/signature_comment.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
+
+    let expected_content = r"static int comp_method_zlib_comp(LIBSSH2_SESSION *session, unsigned char *dest, size_t *dest_len, const unsigned char *src, size_t src_len, void **abstract)";
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        expected_content.as_bytes(),
+    )];
+
+    assert_eq!(extract, expected);
+}
+
+#[test]
+fn body_comment_complicated() {
+    crate::tracing::setup();
+
+    let kind = Kind::Body;
+    let transform = Some(Transform::Code);
+    let span = Location::from(511..1145);
+
+    let content = include_str_lf!("testdata/c99_tc3/signature_comment.c");
+    let opts = Options::new(Target::Function, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("must set up parser");
+
+    let expected_content = r#"{ z_stream *strm = *abstract; int out_maxlen = *dest_len; int status; strm->next_in = (unsigned char *) src; strm->avail_in = src_len; strm->next_out = dest; strm->avail_out = out_maxlen; status = deflate(strm, Z_PARTIAL_FLUSH); if((status == Z_OK) && (strm->avail_out > 0)) { *dest_len = out_maxlen - strm->avail_out; return 0; } _libssh2_debug(session, LIBSSH2_TRACE_TRANS, "unhandled zlib compression error %d, avail_out", status, strm->avail_out); return _libssh2_error(session, LIBSSH2_ERROR_ZLIB, "compression failure"); }"#;
+    let expected = vec![Snippet::from(
+        Metadata::new(kind, transform.into(), span),
+        expected_content.as_bytes(),
+    )];
+
+    assert_eq!(extract, expected);
+}
+
+#[test]
 fn body_comment_hello_world_comment() {
     crate::tracing::setup();
 
@@ -358,4 +400,18 @@ fn body_code_hello_world_comment() {
     )];
 
     assert_eq!(extract, expected);
+}
+
+#[test]
+fn smoke_test() {
+    crate::tracing::setup();
+
+    let target = Targets::default();
+    let kind = Kinds::default();
+    let transform = Transforms::default();
+
+    let content = include_str_lf!("testdata/c99_tc3/smoke_comp.c");
+    let opts = Options::new(target, kind, transform).disable_raw();
+    let extract = c99_tc3::Extractor::extract(&opts, content).expect("extract snippets");
+    assert!(!extract.is_empty(), "must have extracted snippets");
 }

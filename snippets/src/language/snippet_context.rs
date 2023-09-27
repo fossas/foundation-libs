@@ -1,55 +1,67 @@
 use crate::impl_prelude::SnippetLocation;
 use getset::{CopyGetters, Getters};
 use tree_sitter::Node;
+use tree_sitter_traversal::{traverse, Order};
 
 /// This structure represents a view into a larger piece of parsed text.
 /// For snippet scanning, we generally look at just parts of a larger piece of text for each snippet.
-/// However, the parsed nodes all reference locations in the original text.
-/// This structure is meant to make it easier to find content inside a snippet based on previously extracted nodes.
 #[derive(Debug, PartialEq, Getters, CopyGetters)]
 pub struct SnippetContext<'a> {
-    offset: usize,
-    /// The location in the original text of this snippet.
-    #[getset(get = "pub")]
-    location: SnippetLocation,
-    /// The nodes that have been parsed from this context.
-    #[getset(get = "pub")]
-    context_nodes: Vec<Node<'a>>,
-    /// The slice of text represented by [`SnippetLocation`].
+    /// The location (in `content`) of this snippet.
     #[getset(get_copy = "pub")]
+    location: SnippetLocation,
+
+    /// Parsed nodes representing the snippet.
+    #[getset(get = "pub")]
+    nodes: Vec<Node<'a>>,
+
+    /// The full text in which this snippet resides.
     content: &'a [u8],
 }
 
 impl<'a> SnippetContext<'a> {
-    /// Make a new SnippetContext from a sequence of nodes, a location within the original parsed text, and a sequence of bytes for data inside the snippet.
-    /// There is no checking or guarantee that the provided nodes fall within the bounds of the provided content.
-    pub fn new(context_nodes: Vec<Node<'a>>, location: SnippetLocation, content: &'a [u8]) -> Self {
-        let crate::ByteOffset(offset) = location.byte_offset;
+    /// Make a new instance from a parent node and its location within the original parsed text.
+    ///
+    /// Ensure that the content provided is the same as the content used to extract the parent node;
+    /// byte offsets must line up for operations on this type to make sense.
+    pub fn new(parent: Node<'a>, location: SnippetLocation, content: &'a [u8]) -> Self {
+        Self::from_nodes(traverse(parent.walk(), Order::Pre), location, content)
+    }
+
+    /// Make a new instance from a set of nodes and their location within the original parsed text.
+    ///
+    /// Ensure that the content provided is the same as the content used to extract the nodes;
+    /// byte offsets must line up for operations on this type to make sense.
+    pub fn from_nodes(
+        nodes: impl IntoIterator<Item = Node<'a>>,
+        location: SnippetLocation,
+        content: &'a [u8],
+    ) -> Self {
         SnippetContext {
-            offset,
-            context_nodes,
+            nodes: nodes.into_iter().collect(),
             location,
             content,
         }
     }
 
+    /// Extract the part of the content indicated by the location.
+    pub fn content(&self) -> &[u8] {
+        self.location.extract_from(self.content)
+    }
+
     /// Get content from the snippet which is not in ranges covered by the provided nodes.
-    pub fn retrieve_content_around_nodes(
-        &self,
-        nodes: impl Iterator<Item = &'a Node<'a>>,
-    ) -> impl Iterator<Item = &'a [u8]> {
-        let mut start_byte = 0;
+    pub fn content_around(&self, nodes: impl Iterator<Item = &'a Node<'a>>) -> Vec<u8> {
         let mut slices = Vec::new();
+        let mut start_byte = self.location.start_byte();
 
         for node in nodes {
-            let end_byte = node.start_byte() - self.offset;
-            let next_start_byte = node.end_byte() - self.offset;
-            slices.push(&self.content[start_byte..end_byte]);
-            start_byte = next_start_byte;
+            let node_start_byte = node.start_byte();
+            slices.push(&self.content[start_byte..node_start_byte]);
+            start_byte = node.end_byte();
         }
 
-        slices.push(&self.content[start_byte..self.content.len()]);
-
-        slices.into_iter()
+        // `Location::end_byte` is inclusive.
+        slices.push(&self.content[start_byte..=self.location.end_byte()]);
+        slices.concat()
     }
 }
