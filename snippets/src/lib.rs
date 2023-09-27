@@ -630,9 +630,23 @@ impl From<RangeInclusive<usize>> for Location {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
 pub struct ByteOffset(usize);
 
+impl ByteOffset {
+    /// View the offset as a usize.
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
+
 /// The number of bytes to read for the snippet from the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, derive_more::Display)]
 pub struct ByteLen(usize);
+
+impl ByteLen {
+    /// View the length as a usize.
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
 
 flags! {
     /// The kind of item this snippet represents.

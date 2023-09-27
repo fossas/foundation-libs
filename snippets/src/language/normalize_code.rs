@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use tap::Pipe;
+
 use super::{normalize_comments, snippet_context::SnippetContext};
 use crate::text::normalize_space;
 
@@ -8,7 +10,10 @@ use crate::text::normalize_space;
 /// Uses [`super::normalize_comments`] and [`crate::text::normalize_space`].
 #[tracing::instrument(skip_all)]
 pub fn normalize_code<'a>(context: &'a SnippetContext) -> Cow<'a, [u8]> {
-    Vec::from(normalize_space(normalize_comments(context).as_ref())).into()
+    normalize_comments(context)
+        .pipe_borrow(normalize_space)
+        .pipe(Vec::from)
+        .into()
 }
 
 #[cfg(test)]
@@ -35,17 +40,17 @@ mod tests {
         parser
             .set_language(tree_sitter_c::language())
             .expect("Could not set language");
-        let tree = parser.parse(text, None).expect("Couldn't parse test text");
-        let nodes = traverse_tree(&tree, Order::Pre).collect();
 
-        let context = SnippetContext::new(
-            nodes,
+        let tree = parser.parse(text, None).expect("Couldn't parse test text");
+        let context = SnippetContext::from_nodes(
+            traverse_tree(&tree, Order::Pre),
             SnippetLocation::builder()
                 .byte_offset(0)
                 .byte_len(text.len())
                 .build(),
             text,
         );
+
         let out_text = super::normalize_code(&context);
         assert_eq!(
             std::str::from_utf8(out_text.as_ref()).expect("Could not parse out text"),
