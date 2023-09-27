@@ -42,6 +42,29 @@ pub fn main(args: Arguments, report_trace_level: Level) -> anyhow::Result<()> {
     //
     // Hopefully at some point we'll update diagnose with more standardized output,
     // in which case we'll need to update this to handle both cases.
+    //
+    // As well note that some "message" fields actually _are_ standardized;
+    // specifically the ones that relate to trace span events, for example:
+    //
+    // ```
+    // {
+    // "timestamp": "2023-09-27T12:35:02.812794Z",
+    // "level": "INFO",
+    // "fields": {
+    //     "message": "new"
+    // },
+    // "target": "diagnose::cmd::walk",
+    // "span": {
+    //     "root": "\"/some/root/scan/path/\"",
+    //     "name": "main"
+    // },
+    // "spans": []
+    // }
+    // ```
+    //
+    // Unfortunately there's no way to disambiguate these other than matching against the known set of
+    // trace span event messages (`[new, enter, exit, close]`). All other instances of `message`
+    // should be assumed to be the result of outputting a generic log statement.
     let deserializer = serde_json::Deserializer::from_str(&file).into_iter::<Entry>();
     for (index, entry) in deserializer.enumerate() {
         let entry = entry.map_err(|err| anyhow!("parse entry index {index}: {err:#}"))?;
