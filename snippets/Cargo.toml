@@ -12,8 +12,11 @@ sha2-asm = ["sha2/asm"]
 
 # Enables support for each named language.
 # For more info, see the module documentation for the language.
-lang-all = ["lang-c99-tc3"]
+lang-all = ["lang-c99-tc3", "lang-cpp-98"]
 lang-c99-tc3 = []
+
+# Relies on C's implementation of parsing for bare functions.
+lang-cpp-98 = ["lang-c99-tc3"]
 
 [dependencies]
 base64 = "0.21.2"
