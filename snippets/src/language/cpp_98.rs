@@ -35,3 +35,56 @@
 //! [`tree-sitter`]: https://github.com/tree-sitter/tree-sitter
 //! [`tree-sitter-cpp`]: https://github.com/tree-sitter/tree-sitter-c
 //! [standards]: https://en.wikipedia.org/wiki/C%2B%2B#History
+use super::c99_tc3;
+use crate::{impl_language, impl_prelude::*};
+
+/// This module implements support for CPP 98.
+///
+/// Review module documentation for more details.
+#[derive(Copy, Clone)]
+pub struct Language;
+
+impl SnippetLanguage for Language {
+    const NAME: &'static str = "cpp_98";
+    const STRATEGY: LanguageStrategy = LanguageStrategy::Static;
+}
+
+impl_language!(Language);
+
+/// Supports extracting snippets for CPP 98 source code.
+pub struct Extractor;
+
+impl From<Snippet<c99_tc3::Language>> for Snippet<Language> {
+    fn from(
+        Snippet {
+            metadata,
+            fingerprint,
+            content,
+            ..
+        }: Snippet<c99_tc3::Language>,
+    ) -> Snippet<Language> {
+        Snippet::builder()
+            .metadata(metadata)
+            .fingerprint(fingerprint)
+            .content(content)
+            .build()
+    }
+}
+
+impl From<&Snippet<c99_tc3::Language>> for Snippet<Language> {
+    fn from(snippet: &Snippet<c99_tc3::Language>) -> Snippet<Language> {
+        snippet.to_owned().into()
+    }
+}
+
+impl SnippetExtractor for Extractor {
+    type Language = Language;
+
+    fn extract(
+        opts: &SnippetOptions,
+        content: impl AsRef<[u8]>,
+    ) -> Result<Vec<Snippet<Self::Language>>, ExtractorError> {
+        c99_tc3::Extractor::extract(opts, content)
+            .map(|snippets| snippets.into_iter().map(|snippet| snippet.into()).collect())
+    }
+}
