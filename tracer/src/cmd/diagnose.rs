@@ -35,6 +35,13 @@ pub fn main(args: Arguments, report_trace_level: Level) -> anyhow::Result<()> {
     let mut files = HashSet::new();
     let mut inspected_paths = HashSet::new();
 
+    // This uses a lot of extraction from the generic "message" field.
+    //
+    // Ideally, the things we look for here would be in standardized fields,
+    // but currently `diagnose` mostly uses the message field.
+    //
+    // Hopefully at some point we'll update diagnose with more standardized output,
+    // in which case we'll need to update this to handle both cases.
     let deserializer = serde_json::Deserializer::from_str(&file).into_iter::<Entry>();
     for (index, entry) in deserializer.enumerate() {
         let entry = entry.map_err(|err| anyhow!("parse entry index {index}: {err:#}"))?;
