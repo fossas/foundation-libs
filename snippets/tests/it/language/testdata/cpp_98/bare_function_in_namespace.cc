@@ -4,6 +4,8 @@
 
 namespace hello_world {
   
+  const int i = 1;
+  
   int main(/* A comment */) {
       std::cout << "Hello World!";
       return 0;

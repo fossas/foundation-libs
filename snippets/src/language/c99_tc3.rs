@@ -59,6 +59,9 @@ impl_language!(Language);
 /// Supports extracting snippets from C99 TC3 source code.
 pub struct Extractor;
 
+// The cpp_98 extractor is basically a copy-paste of this one.
+// If you make changes to this extractor, consider if they should also be made to the cpp_98 extractor
+// or if the functionality makes sense to be shared.
 impl SnippetExtractor for Extractor {
     type Language = Language;
 
