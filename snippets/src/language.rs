@@ -6,8 +6,8 @@
 #[cfg(feature = "lang-c99-tc3")]
 pub mod c99_tc3;
 
-#[cfg(feature = "lang-cpp-passthrough-c99-tc3")]
-pub mod cpp_passthrough_c99_tc3;
+#[cfg(feature = "lang-cpp-98")]
+pub mod cpp_98;
 
 pub use normalize_code::*;
 pub use normalize_comments::*;
