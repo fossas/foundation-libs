@@ -1,4 +1,4 @@
-//! Implements an [`Extractor`] for the C++ programming language.
+//! Implements an [`Extractor`] for C++ that passes through to C.
 //!
 //! # Standard
 //!
@@ -27,7 +27,12 @@
 //! * Function Bodies
 //! * Full Functions Declarations
 //!
-//! "Function" means functions that are not a method definition as part of a class.
+//! "Function" means functions that are not method definition as part of a class.
+//! It works by passing thru to the C99_TC3 snippet scanner.
+//! Because C99 doesn't have things like classes or namespaces it will also
+//! consider constructs like namespaces to be functions.
+//! In practice, what this means is that individual functions get a snippet and
+//! so do the entire enclosing namespace they are a part of.
 //!
 //! [`Extractor`]: crate::Extractor
 //! [`iso-14882:1998`]: https://www.externsoft.ch/download/cpp-iso.html
