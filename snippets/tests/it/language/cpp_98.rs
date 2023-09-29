@@ -50,7 +50,7 @@ fn functions_in_namespaces_full_comment_normalized() {
     let content = include_str_lf!("testdata/cpp_98/bare_function_in_namespace.cc");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
 
-    let extract = cpp_98::Extractor::extract(&opts, &content).expect("extract snippets");
+    let extract = cpp_98::Extractor::extract(&opts, content).expect("extract snippets");
     let expected = vec![Snippet::from(
         Metadata::new(kind, transform.into(), helloworld_span),
         r#"int main() {
@@ -130,7 +130,7 @@ fn function_in_class_full_comment() {
     let content = include_str_lf!("testdata/cpp_98/simple_class.cc");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
 
-    let extract = cpp_98::Extractor::extract(&opts, &content).expect("extract snippets");
+    let extract = cpp_98::Extractor::extract(&opts, content).expect("extract snippets");
     let expected = vec![
         Snippet::from(
             Metadata::new(kind, transform.into(), member_method_span),
@@ -174,7 +174,7 @@ fn function_in_class_full_code() {
     let content = include_str_lf!("testdata/cpp_98/simple_class.cc");
     let opts = Options::new(Target::Function, kind, transform).disable_raw();
 
-    let extract = cpp_98::Extractor::extract(&opts, &content).expect("extract snippets");
+    let extract = cpp_98::Extractor::extract(&opts, content).expect("extract snippets");
     let expected = vec![
         Snippet::from(
             Metadata::new(kind, transform.into(), member_method_span),
