@@ -51,6 +51,7 @@ use super::c99_tc3;
 use super::normalize_code::normalize_code;
 use super::normalize_comments::normalize_comments;
 use super::snippet_context::SnippetContext;
+
 /// This module implements support for CPP 98.
 ///
 /// Review module documentation for more details.
