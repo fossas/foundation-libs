@@ -1,6 +1,6 @@
 [package]
 name = "snippets"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Provides a framework and implementations for extracting snippets of programming languages from files"
 
@@ -12,8 +12,9 @@ sha2-asm = ["sha2/asm"]
 
 # Enables support for each named language.
 # For more info, see the module documentation for the language.
-lang-all = ["lang-c99-tc3"]
+lang-all = ["lang-c99-tc3", "lang-cpp-98"]
 lang-c99-tc3 = []
+lang-cpp-98 = []
 
 [dependencies]
 base64 = "0.21.2"
@@ -32,6 +33,7 @@ thiserror = "1.0.47"
 tracing = "0.1.37"
 tree-sitter = "0.20.10"
 tree-sitter-c = "0.20.6"
+tree-sitter-cpp = "0.20.3"
 tree-sitter-traversal = "0.1.2"
 typed-builder = "0.15.2"
 

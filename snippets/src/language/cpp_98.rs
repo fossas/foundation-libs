@@ -1,33 +1,40 @@
-//! Implements an [`Extractor`] for the C programming language.
+//! Implements an [`Extractor`] for the C++ programming language.
 //!
 //! # Standard
 //!
-//! C has evolved over the years via different [standards].
-//! This implementation primarily targets parsing [`C99`]
-//! at the [`TC3`] revision.
+//! C++ has evolved over the years via different [standards].
+//! This implementation primarily targets parsing C++ 98.
+//! Initially, this extractor will only support extracting bare functions from C++.
+//! Methods and/or classes are planned for implementation.
 //!
 //! This is because we are using the grammar maintained by the [`tree-sitter`]
-//! project for C, [`tree-sitter-c`], which in its readme states:
+//! project for C++, [`tree-sitter-cpp`].
 //!
-//! > Adapted from this C99 grammar.
-//!
-//! The link provided in that readme doesn't link to a specific grammar,
-//! but appears that it meant to do so; interpreting from the provided link
-//! it appears to indicate the [`iso-9899-tc3`] grammar.
+//! The link provided in the readme links to a couple grammars.
+//! It's unclear exactly which one the code in the repository corresponds to.
+//! One of the linked grammars, however, is clearly labeled [`iso-14882:1998`].
+//! The repository lists parsable [`node types`].
 //!
 //! That being said, this extractor should generally support newer versions
-//! of the C programming language. This is because this extractor is only
-//! concerned with functions, and a review of the later C standards
+//! of the C++ programming language. This is because this extractor is only
+//! concerned with functions, and a review of the later C++ standards
 //! does not imply that function parsing has changed.
 //!
+//! # Targets
+//! This extractor supports extracting the following as snippets from C++ files:
+//!
+//! * Function Signatures
+//! * Function Bodies
+//! * Full Functions Declarations
+//!
+//! "Function" means functions that are not a method definition as part of a class.
+//!
 //! [`Extractor`]: crate::Extractor
-//! [standards]: https://en.wikipedia.org/wiki/C_(programming_language)#History
-//! [`C99`]: https://en.wikipedia.org/wiki/C99
-//! [`TC3`]: https://www.open-std.org/jtc1/sc22/wg14/
+//! [`iso-14882:1998`]: https://www.externsoft.ch/download/cpp-iso.html
+//! [`node types`]: https://github.com/tree-sitter/tree-sitter-cpp/blob/master/src/node-types.json
 //! [`tree-sitter`]: https://github.com/tree-sitter/tree-sitter
-//! [`tree-sitter-c`]: https://github.com/tree-sitter/tree-sitter-c
-//! [`iso-9899-tc3`]: https://github.com/slebok/zoo/tree/master/zoo/c/c99/iso-9899-tc3
-
+//! [`tree-sitter-cpp`]: https://github.com/tree-sitter/tree-sitter-cpp
+//! [standards]: https://en.wikipedia.org/wiki/C%2B%2B#History
 use std::borrow::Cow;
 
 use tap::{Pipe, Tap};
@@ -40,32 +47,33 @@ use crate::text::normalize_space;
 use crate::tree_sitter_consts::{NODE_KIND_FUNC_DEF, NODE_KIND_OPEN_BRACE};
 use crate::{impl_language, impl_prelude::*};
 
+use super::c99_tc3;
 use super::normalize_code::normalize_code;
 use super::normalize_comments::normalize_comments;
 use super::snippet_context::SnippetContext;
 
-/// This module implements support for C99 TC3.
+/// This module implements support for CPP 98.
 ///
 /// Review module documentation for more details.
 #[derive(Copy, Clone)]
 pub struct Language;
 
 impl SnippetLanguage for Language {
-    const NAME: &'static str = "c99_tc3";
+    const NAME: &'static str = "cpp_98";
     const STRATEGY: LanguageStrategy = LanguageStrategy::Static;
 }
+
 impl_language!(Language);
 
-/// Supports extracting snippets from C99 TC3 source code.
+/// Supports extracting snippets for CPP 98 source code.
 pub struct Extractor;
 
-// The cpp_98 extractor is basically a copy-paste of this one.
-// If you make changes to this extractor, consider if they should also be made to the cpp_98 extractor
+// This extractor is basically a copy-paste of c99_tc3 extractor.
+// If you make changes to this extractor, consider if they should also be made to the c99_tc3 extractor
 // or if the functionality makes sense to be shared.
 impl SnippetExtractor for Extractor {
     type Language = Language;
 
-    #[tracing::instrument(skip_all, fields(kinds = %opts.kinds(), transforms = %opts.transforms(), content_len = content.as_ref().len()))]
     fn extract(
         opts: &SnippetOptions,
         content: impl AsRef<[u8]>,
@@ -299,7 +307,7 @@ fn inspect_node(node: &Node<'_>, content: &[u8]) {
 #[tracing::instrument]
 fn init_parser() -> Result<tree_sitter::Parser, ExtractorError> {
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(tree_sitter_c::language())?;
+    parser.set_language(tree_sitter_cpp::language())?;
     Ok(parser)
 }
 

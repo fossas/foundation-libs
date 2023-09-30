@@ -16,6 +16,7 @@
 //! ---|---|---
 //! `lang-all` | Enables all features that are of the kind "Language" | Language
 //! `lang-c99-tc3` | Enables support for C99 TC3 | Language
+//! `lang-cpp` | Enables support for C++ 98. | Language
 //! `sha2-asm` | Enables hardware acceleration for SHA2 | Performance
 
 #![deny(clippy::invalid_regex)]
