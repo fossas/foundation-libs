@@ -68,29 +68,6 @@ impl_language!(Language);
 /// Supports extracting snippets for CPP 98 source code.
 pub struct Extractor;
 
-impl From<Snippet<c99_tc3::Language>> for Snippet<Language> {
-    fn from(
-        Snippet {
-            metadata,
-            fingerprint,
-            content,
-            ..
-        }: Snippet<c99_tc3::Language>,
-    ) -> Snippet<Language> {
-        Snippet::builder()
-            .metadata(metadata)
-            .fingerprint(fingerprint)
-            .content(content)
-            .build()
-    }
-}
-
-impl From<&Snippet<c99_tc3::Language>> for Snippet<Language> {
-    fn from(snippet: &Snippet<c99_tc3::Language>) -> Snippet<Language> {
-        snippet.to_owned().into()
-    }
-}
-
 // This extractor is basically a copy-paste of c99_tc3 extractor.
 // If you make changes to this extractor, consider if they should also be made to the c99_tc3 extractor
 // or if the functionality makes sense to be shared.
