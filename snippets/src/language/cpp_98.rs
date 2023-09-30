@@ -33,7 +33,7 @@
 //! [`iso-14882:1998`]: https://www.externsoft.ch/download/cpp-iso.html
 //! [`node types`]: https://github.com/tree-sitter/tree-sitter-cpp/blob/master/src/node-types.json
 //! [`tree-sitter`]: https://github.com/tree-sitter/tree-sitter
-//! [`tree-sitter-cpp`]: https://github.com/tree-sitter/tree-sitter-c
+//! [`tree-sitter-cpp`]: https://github.com/tree-sitter/tree-sitter-cpp
 //! [standards]: https://en.wikipedia.org/wiki/C%2B%2B#History
 use std::borrow::Cow;
 
