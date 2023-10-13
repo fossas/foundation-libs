@@ -404,7 +404,7 @@ pub enum Strategy {
 
 /// An extracted snippet from the given unit of source code.
 #[derive(Clone, Getters, CopyGetters, Index, Deref, Derivative, TypedBuilder)]
-#[derivative(PartialOrd, Ord, PartialEq, Eq)]
+#[derivative(Ord, PartialEq, Eq)]
 pub struct Snippet<L> {
     /// Metadata for the extracted snippet.
     #[getset(get_copy = "pub")]
@@ -428,6 +428,12 @@ pub struct Snippet<L> {
     /// but `PhantomData<T>` is always equal to itself for both checks.
     #[builder(default, setter(skip))]
     language: PhantomData<L>,
+}
+
+impl<L> PartialOrd for Snippet<L> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl<L> Snippet<L> {
