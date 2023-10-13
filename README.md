@@ -15,17 +15,17 @@ Foundational libraries and helper binaries for cross-language support, written i
 >
 > You can find the new repositories below:
 > - If it was a binary, it'll be in a new repository named after the binary.
->   - `tracer`: planned to be folded into `https://github.com/fossas/diagnose`.
+>   - `tracer`: planned to be folded into https://github.com/fossas/diagnose.
 > - If it was a library, it'll be in a new repository named after the library, usually prepended with `lib-` or suffixed by the language (`-rs`).
 >   The intention is that if the library is meant to be canonical (so it's used across languages, via FFI) it gets the `lib-` prefix.
 >   If it's language specific, it gets the `-rs` suffix.
->   - `srclib`: `https://github.com/fossas/srclib-rs`
->   - `traceconf`: `https://github.com/fossas/traceconf-rs`
->   - `snippets`: `https://github.com/fossas/lib-snippets`
->   - `archive`: `https://github.com/fossas/lib-archive`
->   - `berkeleydb`: `https://github.com/fossas/lib-berkeleydb`
+>   - `srclib`: https://github.com/fossas/srclib-rs
+>   - `traceconf`: https://github.com/fossas/traceconf-rs
+>   - `snippets`: https://github.com/fossas/lib-snippets
+>   - `archive`: https://github.com/fossas/lib-archive
+>   - `berkeleydb`: https://github.com/fossas/lib-berkeleydb
 >   - `fingerprint`: Folding into `vsi`.
->   - `vsi`: planned to be exposed as a library only at `https://github.com/fossas/lib-vsi`.
+>   - `vsi`: planned to be exposed as a library only at https://github.com/fossas/lib-vsi.
 
 ## finding your way around
 
