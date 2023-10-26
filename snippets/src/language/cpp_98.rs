@@ -47,7 +47,6 @@ use crate::text::normalize_space;
 use crate::tree_sitter_consts::{NODE_KIND_FUNC_DEF, NODE_KIND_OPEN_BRACE};
 use crate::{impl_language, impl_prelude::*};
 
-use super::c99_tc3;
 use super::normalize_code::normalize_code;
 use super::normalize_comments::normalize_comments;
 use super::snippet_context::SnippetContext;
